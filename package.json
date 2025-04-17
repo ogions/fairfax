@@ -7,7 +7,7 @@
   "type": "module",
   "main": "monica.ts",
   "scripts": {
-    "build": "esbuild monica.ts --bundle --outfile=dist/main.js",
+    "build": "esbuild src/monica.ts --bundle --outfile=dist/main.js",
     "test": "npm run build && http-server ./dist"
   },
   "dependencies": {

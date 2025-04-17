@@ -646,7 +646,7 @@
     }
   };
 
-  // range.ts
+  // src/range.ts
   var RangeContext = class {
     constructor(range, view) {
       this.previousLine = view.getLineAt(range.start - 1);
@@ -674,7 +674,7 @@
     }
   };
 
-  // selection.ts
+  // src/selection.ts
   var ViewSelection = class {
     constructor(view) {
       this.view = view;
@@ -726,7 +726,7 @@
     }
   };
 
-  // view.ts
+  // src/view.ts
   var View = class {
     constructor(container2) {
       this.blockMap = /* @__PURE__ */ new Map([
@@ -862,7 +862,7 @@
     }
   };
 
-  // editor.ts
+  // src/editor.ts
   var Editor = class {
     constructor(container2) {
       this.parser = new Parser();
@@ -940,7 +940,7 @@
     }
   };
 
-  // monica.ts
+  // src/monica.ts
   var container = document.getElementById("monica");
   if (container) new Editor(container);
 })();
