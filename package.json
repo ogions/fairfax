@@ -7,8 +7,8 @@
   "type": "module",
   "main": "monica.ts",
   "scripts": {
-    "build": "esbuild monica.ts --bundle --outfile=build/build.js",
-    "test": "npm run build && http-server ./build"
+    "build": "esbuild monica.ts --bundle --outfile=dist/main.js",
+    "test": "npm run build && http-server ./dist"
   },
   "dependencies": {
         "fairfax": "file:../fairfax"
