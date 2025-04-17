@@ -1,0 +1,61 @@
+main {
+    width: 800px;
+    margin: auto;
+    padding: 1rem;
+    border: 1px solid gray;
+
+    font-family: monospace;
+    white-space-collapse: preserve-spaces;
+}
+
+.SceneHeading {
+    font-weight: bold;
+}
+
+.Character {
+    margin-left: 50%;
+}
+
+.Dialogue {
+    margin-left: 25%;
+}
+
+.Parenthetical {
+    margin-left: 37%;
+}
+
+.Transition {
+    text-align: right;
+}
+
+:has(> .Centered) {
+    text-align: center;
+}
+
+.Bold {
+    font-weight: bold;
+}
+
+.Italic {
+    font-style: italic;
+}
+
+.Underline {
+    text-decoration: underline;
+}
+
+.Boneyard {
+    color: gray;
+}
+
+.Note {
+    color: green;
+}
+
+.Special {
+    color: gray;
+}
+
+.TitlePage {
+    color: blue;
+}

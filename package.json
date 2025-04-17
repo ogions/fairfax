@@ -1,0 +1,19 @@
+{
+  "name": "monica",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "Zach Lo",
+  "type": "module",
+  "main": "monica.ts",
+  "scripts": {
+    "build": "esbuild monica.ts --bundle --outfile=build/build.js",
+    "test": "npm run build && http-server ./build"
+  },
+  "dependencies": {
+        "fairfax": "file:../fairfax"
+    },
+  "devDependencies": {
+    "esbuild": "0.25.2"
+  }
+}

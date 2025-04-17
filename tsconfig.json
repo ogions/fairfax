@@ -1,0 +1,10 @@
+{
+    "compilerOptions": {
+        "strict": true,
+        "moduleResolution": "node",
+        "paths": {
+            "fairfax": ["../fairfax"]
+        },
+        "target": "ES6"
+    }
+}
