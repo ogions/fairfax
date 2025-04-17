@@ -431,33 +431,9 @@
     }
   };
 
-  // ../fairfax/parser.ts
-  var ParserOptions = class {
-    constructor(isInDialogue, isInTitlePage, nextLineIsBlank, previousLineIsBlank, includeMarkup) {
-      this.isInDialogue = isInDialogue ?? false;
-      this.isInTitlePage = isInTitlePage ?? true;
-      this.nextLineIsBlank = nextLineIsBlank ?? true;
-      this.previousLineIsBlank = previousLineIsBlank ?? true;
-      this.includeMarkup = includeMarkup ?? false;
-    }
-  };
-  var Parser = class {
+  // ../fairfax/stylizer.ts
+  var Stylizer = class {
     constructor() {
-      this.lexer = new Lexer();
-      this.typeMap = /* @__PURE__ */ new Map([
-        [0 /* BlankLine */, 0 /* BlankLine */],
-        [1 /* SceneHeading */, 1 /* SceneHeading */],
-        [5 /* Action */, 2 /* Action */],
-        [7 /* Character */, 3 /* Character */],
-        [9 /* Dialogue */, 4 /* Dialogue */],
-        [10 /* Parenthetical */, 5 /* Parenthetical */],
-        [12 /* Lyric */, 6 /* Lyric */],
-        [14 /* Transition */, 7 /* Transition */],
-        [19 /* PageBreak */, 8 /* PageBreak */],
-        [24 /* SectionHeading */, 9 /* SectionHeading */],
-        [26 /* Synopsis */, 10 /* Synopsis */],
-        [28 /* TitlePage */, 11 /* TitlePage */]
-      ]);
       this.styleMap = /* @__PURE__ */ new Map([
         [16 /* CenterLeft */, 0 /* Centered */],
         [17 /* CenterRight */, 0 /* Centered */],
@@ -485,84 +461,10 @@
         22 /* BoneyardOpen */,
         20 /* NoteOpen */
       ]);
-      this.openKey = "";
-      this.openValue = [];
       this.openStyles = /* @__PURE__ */ new Set();
       this.openStyleStarts = /* @__PURE__ */ new Map();
-      this.openMultilines = /* @__PURE__ */ new Set();
-      this.openMultilineStarts = /* @__PURE__ */ new Map();
     }
-    parse(chunk, options) {
-      const lexerOptions = new LexerOptions(
-        options.isInDialogue,
-        options.isInTitlePage,
-        options.nextLineIsBlank,
-        options.previousLineIsBlank
-      );
-      const tokens = this.lexer.lex(chunk, lexerOptions);
-      const blocks = [];
-      const titlePage = /* @__PURE__ */ new Map();
-      for (let [i, token] of tokens.entries()) {
-        const blockType = this.typeMap.get(token.type) ?? 2 /* Action */;
-        const runs = typeof token.content === "object" ? this.parseInnerTokens(token.content, titlePage, blocks, i) : [new Run(token.content, /* @__PURE__ */ new Set([]))];
-        blocks.push(new Block(blockType, runs));
-        if (this.openStyles.has(4 /* Boneyard */)) {
-          this.openMultilines.add(4 /* Boneyard */);
-          this.openMultilineStarts.set(
-            4 /* Boneyard */,
-            [i, this.openStyleStarts.get(4 /* Boneyard */)]
-          );
-        }
-        if (this.openStyles.has(5 /* Note */)) {
-          this.openMultilines.add(5 /* Note */);
-          this.openMultilineStarts.set(
-            5 /* Note */,
-            [i, this.openStyleStarts.get(5 /* Note */)]
-          );
-        }
-        this.openStyles.clear();
-        this.openStyleStarts.clear();
-      }
-      this.openMultilines.clear();
-      this.openMultilineStarts.clear();
-      if (this.openKey) {
-        titlePage.set(this.openKey, this.openValue.join("\n"));
-        this.openKey = "";
-        this.openValue = [];
-      }
-      for (let block of blocks) {
-        this.collapseRuns(block);
-      }
-      return new Document(titlePage, blocks);
-    }
-    parseInnerTokens(tokens, titlePage, blocks, lineIndex) {
-      let runs = [];
-      for (let [i, token] of tokens.entries()) {
-        const text = typeof token.content === "string" ? token.content : "";
-        const styles = this.getStylesFrom(token, blocks, runs, lineIndex, i);
-        if (token.type === 29 /* TitlePageKey */ || token.type === 30 /* TitlePageValue */) {
-          this.handleTitlePageToken(token, titlePage);
-        }
-        runs.push(new Run(text, styles));
-      }
-      return runs;
-    }
-    collapseRuns(block) {
-      let collapsedRuns = [];
-      let currentRun = new Run("", /* @__PURE__ */ new Set());
-      for (let run of block.runs) {
-        if (currentRun.text && !this.stylesMatch(currentRun, run)) {
-          collapsedRuns.push(currentRun);
-          currentRun = run;
-        } else {
-          currentRun.text += run.text;
-          currentRun.styles = run.styles;
-        }
-      }
-      collapsedRuns.push(currentRun);
-      block.runs = collapsedRuns;
-    }
-    getStylesFrom(token, blocks, runs, lineIndex, tokenIndex) {
+    stylize(token, blocks, runs, lineIndex, tokenIndex) {
       if (token.type === 2 /* SceneHeadingForce */ || token.type === 4 /* SceneNumberFence */ || token.type === 6 /* ActionForce */ || token.type === 8 /* CharacterForce */ || token.type === 13 /* LyricLeader */ || token.type === 15 /* TransitionForce */ || token.type === 25 /* SectionHeadingLeader */ || token.type === 27 /* SynopsisLeader */) {
         return /* @__PURE__ */ new Set([6 /* Special */]);
       }
@@ -571,17 +473,16 @@
       }
       return this.handleStyle(token, blocks, runs, lineIndex, tokenIndex);
     }
+    reset() {
+      this.openStyles = /* @__PURE__ */ new Set();
+      this.openStyleStarts = /* @__PURE__ */ new Map();
+    }
     handleStyle(token, blocks, runs, lineIndex, tokenIndex) {
       if (this.closerTokens.has(token.type)) {
         const style = this.styleMap.get(token.type);
-        if (typeof style !== "undefined") {
-          if (this.openMultilines.has(style)) {
-            this.closeMultiline(style, blocks, runs, lineIndex, tokenIndex);
-            return /* @__PURE__ */ new Set([6 /* Special */]);
-          } else if (this.openStyles.has(style)) {
-            this.closeStyle(style, runs, tokenIndex);
-            return /* @__PURE__ */ new Set([6 /* Special */]);
-          }
+        if (typeof style !== "undefined" && this.openStyles.has(style)) {
+          this.closeStyle(style, runs, tokenIndex);
+          return /* @__PURE__ */ new Set([6 /* Special */]);
         }
       }
       if (this.openerTokens.has(token.type)) {
@@ -605,6 +506,98 @@
         runs[i].styles.add(style);
       }
       this.openStyles.delete(style);
+    }
+  };
+
+  // ../fairfax/parser.ts
+  var ParserOptions = class {
+    constructor(isInDialogue, isInTitlePage, nextLineIsBlank, previousLineIsBlank, includeMarkup) {
+      this.isInDialogue = isInDialogue ?? false;
+      this.isInTitlePage = isInTitlePage ?? true;
+      this.nextLineIsBlank = nextLineIsBlank ?? true;
+      this.previousLineIsBlank = previousLineIsBlank ?? true;
+      this.includeMarkup = includeMarkup ?? false;
+    }
+  };
+  var Parser = class {
+    constructor() {
+      this.lexer = new Lexer();
+      this.stylizer = new Stylizer();
+      this.typeMap = /* @__PURE__ */ new Map([
+        [0 /* BlankLine */, 0 /* BlankLine */],
+        [1 /* SceneHeading */, 1 /* SceneHeading */],
+        [5 /* Action */, 2 /* Action */],
+        [7 /* Character */, 3 /* Character */],
+        [9 /* Dialogue */, 4 /* Dialogue */],
+        [10 /* Parenthetical */, 5 /* Parenthetical */],
+        [12 /* Lyric */, 6 /* Lyric */],
+        [14 /* Transition */, 7 /* Transition */],
+        [19 /* PageBreak */, 8 /* PageBreak */],
+        [24 /* SectionHeading */, 9 /* SectionHeading */],
+        [26 /* Synopsis */, 10 /* Synopsis */],
+        [28 /* TitlePage */, 11 /* TitlePage */]
+      ]);
+      this.multilineStyles = /* @__PURE__ */ new Set([
+        4 /* Boneyard */,
+        5 /* Note */
+      ]);
+      this.openKey = "";
+      this.openValue = [];
+      this.openMultilines = /* @__PURE__ */ new Set();
+      this.openMultilineStarts = /* @__PURE__ */ new Map();
+    }
+    parse(chunk, options) {
+      const lexerOptions = new LexerOptions(
+        options.isInDialogue,
+        options.isInTitlePage,
+        options.nextLineIsBlank,
+        options.previousLineIsBlank
+      );
+      const tokens = this.lexer.lex(chunk, lexerOptions);
+      const blocks = [];
+      const titlePage = /* @__PURE__ */ new Map();
+      for (let [i, token] of tokens.entries()) {
+        const blockType = this.typeMap.get(token.type) ?? 2 /* Action */;
+        const runs = typeof token.content === "object" ? this.parseInnerTokens(token.content, titlePage, blocks, i) : [new Run(token.content, /* @__PURE__ */ new Set([]))];
+        blocks.push(new Block(blockType, runs));
+        this.stylizer.reset();
+      }
+      if (this.openKey) {
+        titlePage.set(this.openKey, this.openValue.join("\n"));
+        this.openKey = "";
+        this.openValue = [];
+      }
+      for (let block of blocks) {
+        this.collapseRuns(block);
+      }
+      return new Document(titlePage, blocks);
+    }
+    parseInnerTokens(tokens, titlePage, blocks, lineIndex) {
+      let runs = [];
+      for (let [i, token] of tokens.entries()) {
+        const text = typeof token.content === "string" ? token.content : "";
+        const styles = this.stylizer.stylize(token, blocks, runs, lineIndex, i);
+        if (token.type === 29 /* TitlePageKey */ || token.type === 30 /* TitlePageValue */) {
+          this.handleTitlePageToken(token, titlePage);
+        }
+        runs.push(new Run(text, styles));
+      }
+      return runs;
+    }
+    collapseRuns(block) {
+      let collapsedRuns = [];
+      let currentRun = new Run("", /* @__PURE__ */ new Set());
+      for (let run of block.runs) {
+        if (currentRun.text && !this.stylesMatch(currentRun, run)) {
+          collapsedRuns.push(currentRun);
+          currentRun = run;
+        } else {
+          currentRun.text += run.text;
+          currentRun.styles = run.styles;
+        }
+      }
+      collapsedRuns.push(currentRun);
+      block.runs = collapsedRuns;
     }
     closeMultiline(style, blocks, runs, lineIndex, tokenIndex) {
       const [lineStart, charStart] = this.openMultilineStarts.get(style);
