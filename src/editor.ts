@@ -12,13 +12,13 @@ export class Editor {
     constructor(container: HTMLElement) {
         this.container = container;
         this.container.setAttribute("contenteditable", "true");
-        this.container.addEventListener("input", (e) => this.handleInput(e));
+        this.container.addEventListener("input", (e) => this.handleInput(e as InputEvent));
 
         this.mlManager = new MultilineManager(container);
         this.view = new View(container);
     }
 
-    handleInput(e: Event) {
+    handleInput(e: InputEvent) {
         let activeLine = this.view.getActiveLine();
 
         /* If there are no more child lines in the main container, then we
@@ -35,6 +35,13 @@ export class Editor {
         if (!activeLine) return;
 
         this.updateLine(activeLine, true);
+
+        if (e.inputType === "insertParagraph") {
+            const lineIndex = this.view.getLineIndex(activeLine);
+            if (typeof lineIndex !== "undefined") {
+                this.mlManager.insertLine(lineIndex);
+            }
+        }
     }
 
     updateLine(line: HTMLElement, isOrigin?: boolean) {
@@ -46,8 +53,6 @@ export class Editor {
 
     updateRange(range: LineRange, isOrigin?: boolean) {
         
-        console.log("Updating range " + range.start + ", " + range.end);
-
         const text = this.view.getTextInRange(range);
 
         /* Collect context from neighboring lines to feed as options into the
@@ -56,8 +61,8 @@ export class Editor {
          */
         const context = new RangeContext(range, this.view);
         const parserOptions = new ParserOptions(
+            context.isDocumentStart,
             context.isInDialogue,
-            undefined,
             context.nextLineIsBlank,
             context.previousLineIsBlank
         );
@@ -68,6 +73,7 @@ export class Editor {
 
         // Get multiline info from the document
         this.mlManager.manage(fairfaxDocument, range);
+        console.log(this.mlManager.activeRanges);
         
         /* If this range overlaps with any active multiline ranges, then we
          * should parse that entire range along with this one.
@@ -75,7 +81,6 @@ export class Editor {
         for (let multiline of this.mlManager.activeRanges) {
             if (range.overlaps(multiline.range) &&
                 !range.includes(multiline.range)) {
-                console.log("Overlapping multiline detected")
                 this.updateRange(range.extend(multiline.range), true);
                 return;
             }

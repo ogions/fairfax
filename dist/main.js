@@ -21,15 +21,6 @@
       this.styles = styles;
     }
   };
-  var MultilineStructure = class {
-    constructor(type, start, startToken, endLine, endToken) {
-      this.type = type;
-      this.startLine = start;
-      this.startToken = startToken;
-      this.endLine = endLine;
-      this.endToken = endToken;
-    }
-  };
 
   // ../fairfax/src/tokens.ts
   var Token = class {
@@ -66,6 +57,9 @@
           0 /* BlankLine */,
           line
         );
+      }
+      if (lexer.isDocumentStart && this.regexes.titlePageKey.test(line)) {
+        lexer.isInTitlePage = true;
       }
       if (lexer.isInTitlePage) {
         if (this.regexes.titlePageKey.test(line)) {
@@ -355,9 +349,9 @@
 
   // ../fairfax/src/lexer.ts
   var LexerOptions = class {
-    constructor(isInDialogue, isInTitlePage, nextLineIsBlank, previousLineIsBlank) {
+    constructor(isDocumentStart, isInDialogue, nextLineIsBlank, previousLineIsBlank) {
+      this.isDocumentStart = isDocumentStart;
       this.isInDialogue = isInDialogue;
-      this.isInTitlePage = isInTitlePage;
       this.nextLineIsBlank = nextLineIsBlank;
       this.previousLineIsBlank = previousLineIsBlank;
     }
@@ -365,6 +359,7 @@
   var Lexer = class {
     constructor() {
       // Block-level flags
+      this.isDocumentStart = false;
       this.isInDialogue = false;
       this.isInTitlePage = true;
       this.nextLineIsBlank = true;
@@ -376,8 +371,9 @@
       this.tokenizer = new Tokenizer();
     }
     lex(chunk, options) {
+      this.isDocumentStart = options.isDocumentStart;
       this.isInDialogue = options.isInDialogue;
-      this.isInTitlePage = options.isInTitlePage;
+      this.isInTitlePage = false;
       this.previousLineIsBlank = options.previousLineIsBlank;
       const lines = chunk.split("\n");
       const tokens = [];
@@ -389,6 +385,7 @@
           this.nextLineIsBlank = options.nextLineIsBlank;
         }
         const token = this.tokenizer.tokenizeLine(lines[i], this);
+        this.isDocumentStart = false;
         if (token.type === 0 /* BlankLine */ || token.type === 19 /* PageBreak */) {
           this.previousLineIsBlank = true;
           this.isInDialogue = false;
@@ -443,6 +440,15 @@
   };
 
   // ../fairfax/src/multiline.ts
+  var MultilineStructure = class {
+    constructor(type, start, startToken, endLine, endToken) {
+      this.type = type;
+      this.startLine = start;
+      this.startToken = startToken;
+      this.endLine = endLine;
+      this.endToken = endToken;
+    }
+  };
   var MultilineManager = class {
     constructor() {
       this.multilineStyles = /* @__PURE__ */ new Map([
@@ -463,6 +469,7 @@
       ]);
       this.openMultilines = [];
       this.activeMultilines = /* @__PURE__ */ new Set();
+      this.hasOpenTitlePage = false;
     }
     reset() {
       this.openMultilines = [];
@@ -511,7 +518,6 @@
     }
     closeMultiline(multiline, multilineIndex, blocks, runs, lineIndex, tokenIndex) {
       const style = this.multilineStyles.get(multiline.type);
-      console.log("Closing multiline");
       const startLineIndex = typeof multiline.startLine === "undefined" ? lineIndex : multiline.startLine;
       const tokenStartIndex = typeof multiline.startToken === "undefined" ? tokenIndex : multiline.startToken;
       const endLineIndex = typeof multiline.endLine === "undefined" ? lineIndex : multiline.endLine;
@@ -536,6 +542,20 @@
       multiline.endLine = endLineIndex;
       this.openMultilines.splice(multilineIndex, 1);
       this.activeMultilines.add(multiline);
+    }
+    openTitlePage() {
+      this.hasOpenTitlePage = true;
+      console.log("Title page open");
+    }
+    closeTitlePage(index) {
+      console.log("Titel page closed");
+      this.hasOpenTitlePage = false;
+      this.activeMultilines.add(new MultilineStructure(
+        2 /* TitlePage */,
+        0,
+        void 0,
+        index + 1
+      ));
     }
   };
 
@@ -576,6 +596,12 @@
       if (token.type === 2 /* SceneHeadingForce */ || token.type === 4 /* SceneNumberFence */ || token.type === 6 /* ActionForce */ || token.type === 8 /* CharacterForce */ || token.type === 13 /* LyricLeader */ || token.type === 15 /* TransitionForce */ || token.type === 25 /* SectionHeadingLeader */ || token.type === 27 /* SynopsisLeader */) {
         return /* @__PURE__ */ new Set([6 /* Special */]);
       }
+      if (token.type === 29 /* TitlePageKey */) {
+        return /* @__PURE__ */ new Set([7 /* TitlePageKey */]);
+      }
+      if (token.type === 30 /* TitlePageValue */) {
+        return /* @__PURE__ */ new Set([8 /* TitlePageValue */]);
+      }
       if (token.type === 34 /* Text */) {
         return /* @__PURE__ */ new Set();
       }
@@ -615,9 +641,9 @@
 
   // ../fairfax/src/parser.ts
   var ParserOptions = class {
-    constructor(isInDialogue, isInTitlePage, nextLineIsBlank, previousLineIsBlank, includeMarkup) {
+    constructor(isDocumentStart, isInDialogue, nextLineIsBlank, previousLineIsBlank, includeMarkup) {
+      this.isDocumentStart = isDocumentStart ?? false;
       this.isInDialogue = isInDialogue ?? false;
-      this.isInTitlePage = isInTitlePage ?? false;
       this.nextLineIsBlank = nextLineIsBlank ?? true;
       this.previousLineIsBlank = previousLineIsBlank ?? true;
       this.includeMarkup = includeMarkup ?? false;
@@ -647,12 +673,13 @@
     }
     parse(chunk, options) {
       const lexerOptions = new LexerOptions(
+        options.isDocumentStart,
         options.isInDialogue,
-        options.isInTitlePage,
         options.nextLineIsBlank,
         options.previousLineIsBlank
       );
       const tokens = this.lexer.lex(chunk, lexerOptions);
+      console.log(tokens);
       const blocks = [];
       this.mlManager.reset();
       const titlePage = /* @__PURE__ */ new Map();
@@ -668,6 +695,9 @@
         } else {
           if (blockType === 11 /* TitlePage */) {
             this.parseTitlePageTokens(token.content, titlePage);
+            this.mlManager.openTitlePage();
+          } else if (blockType === 0 /* BlankLine */) {
+            if (this.mlManager.hasOpenTitlePage) this.mlManager.closeTitlePage(i);
           }
           const runs = this.parseInnerTokens(token.content, blocks, i);
           blocks.push(new Block(blockType, runs));
@@ -677,6 +707,9 @@
         titlePage.set(this.openKey, this.openValue.join("\n"));
         this.openKey = "";
         this.openValue = [];
+      }
+      if (this.mlManager.hasOpenTitlePage) {
+        this.mlManager.closeTitlePage(blocks.length);
       }
       return new Document(
         titlePage,
@@ -720,6 +753,7 @@
     constructor(range, view) {
       this.previousLine = view.getLineAt(range.start - 1);
       this.nextLine = view.getLineAt(range.end + 1);
+      this.isDocumentStart = false;
       this.isInDialogue = false;
       this.nextLineIsBlank = true;
       this.previousLineIsBlank = true;
@@ -730,6 +764,8 @@
         } else {
           this.previousLineIsBlank = this.previousLine.classList.contains("BlankLine");
         }
+      } else {
+        if (range.start === 0) this.isDocumentStart = true;
       }
       if (this.nextLine) {
         this.nextLineIsBlank = this.nextLine.classList.contains("BlankLine");
@@ -829,7 +865,6 @@
           this.tryClosing(end);
         }
       }
-      console.log(this);
     }
     tryClosing(end) {
       if (typeof end.start === "undefined") {
@@ -861,6 +896,13 @@
         start.type,
         new LineRange(start.start, end.end)
       ));
+    }
+    insertLine(index) {
+      for (let range of this.activeRanges) {
+        if (range.range.includesIndex(index)) {
+          range.range.end += 1;
+        }
+      }
     }
   };
 
@@ -941,7 +983,8 @@
         [4 /* Boneyard */, "Boneyard"],
         [5 /* Note */, "Note"],
         [6 /* Special */, "Special"],
-        [7 /* TitlePage */, "TitlePage"]
+        [7 /* TitlePageKey */, "TitlePageKey"],
+        [8 /* TitlePageValue */, "TitlePageValue"]
       ]);
       this.container = container2;
       this.selection = new ViewSelection(this);
@@ -1044,7 +1087,7 @@
       }
       line.innerHTML = "";
       line.appendChild(fragment);
-      if (line.innerHTML === "") line.appendChild(document.createElement("br"));
+      if (line.textContent === "") line.innerHTML = "<br>";
     }
     classLine(line, type) {
       const lineClass = this.blockMap.get(type) ?? "Action";
@@ -1069,6 +1112,12 @@
       }
       if (!activeLine) return;
       this.updateLine(activeLine, true);
+      if (e.inputType === "insertParagraph") {
+        const lineIndex = this.view.getLineIndex(activeLine);
+        if (typeof lineIndex !== "undefined") {
+          this.mlManager.insertLine(lineIndex);
+        }
+      }
     }
     updateLine(line, isOrigin) {
       const lineIndex = this.view.getLineIndex(line);
@@ -1077,21 +1126,20 @@
       }
     }
     updateRange(range, isOrigin) {
-      console.log("Updating range " + range.start + ", " + range.end);
       const text = this.view.getTextInRange(range);
       const context = new RangeContext(range, this.view);
       const parserOptions = new ParserOptions(
+        context.isDocumentStart,
         context.isInDialogue,
-        void 0,
         context.nextLineIsBlank,
         context.previousLineIsBlank
       );
       const [firstLineStartingClass, lastLineStartingClass] = this.getBorderClasses(range);
       const fairfaxDocument = this.parser.parse(text, parserOptions);
       this.mlManager.manage(fairfaxDocument, range);
+      console.log(this.mlManager.activeRanges);
       for (let multiline of this.mlManager.activeRanges) {
         if (range.overlaps(multiline.range) && !range.includes(multiline.range)) {
-          console.log("Overlapping multiline detected");
           this.updateRange(range.extend(multiline.range), true);
           return;
         }

@@ -88,7 +88,6 @@ export class MultilineManager {
                 this.tryClosing(end);
             }
         }
-        console.log(this);
     }
 
     tryClosing(end: MultilineEnd) {
@@ -132,5 +131,13 @@ export class MultilineManager {
             start.type,
             new LineRange(start.start, end.end)
         ));
+    }
+
+    insertLine(index: number) {
+        for (let range of this.activeRanges) {
+            if (range.range.includesIndex(index)) {
+                range.range.end += 1;
+            }
+        }
     }
 }

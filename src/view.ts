@@ -28,7 +28,8 @@ export class View {
         [RunStyle.Boneyard, "Boneyard"],
         [RunStyle.Note, "Note"],
         [RunStyle.Special, "Special"],
-        [RunStyle.TitlePage, "TitlePage"]
+        [RunStyle.TitlePageKey, "TitlePageKey"],
+        [RunStyle.TitlePageValue, "TitlePageValue"]
     ]);
 
     constructor(container: HTMLElement) {
@@ -182,7 +183,7 @@ export class View {
         line.appendChild(fragment);
             
         // If the line is empty, we keep a line break node.
-        if (line.innerHTML === "") line.appendChild(document.createElement("br"));
+        if (line.textContent === "") line.innerHTML = "<br>";
     }
     
     classLine(line: HTMLElement, type: BlockType) {

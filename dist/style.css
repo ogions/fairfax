@@ -57,5 +57,13 @@ main {
 }
 
 .TitlePage {
-    color: blue;
+    color: gray;
+}
+
+.TitlePageKey {
+    color: green;
+}
+
+.TitlePageValue {
+    color: purple;
 }

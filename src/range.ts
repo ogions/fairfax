@@ -2,6 +2,7 @@ import { View } from "./view";
 
 export class RangeContext {
 
+    isDocumentStart: boolean;
     isInDialogue: boolean;
     nextLineIsBlank: boolean;
     previousLineIsBlank: boolean;
@@ -14,6 +15,7 @@ export class RangeContext {
         this.nextLine = view.getLineAt(range.end + 1);
 
         // Default values
+        this.isDocumentStart = false;
         this.isInDialogue = false;
         this.nextLineIsBlank = true;
         this.previousLineIsBlank = true;
@@ -28,6 +30,8 @@ export class RangeContext {
             } else {
                 this.previousLineIsBlank = this.previousLine.classList.contains("BlankLine");
             }
+        } else {
+            if (range.start === 0) this.isDocumentStart = true;
         }
 
         if (this.nextLine) {
