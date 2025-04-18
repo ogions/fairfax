@@ -11,7 +11,7 @@ export class RangeContext {
     constructor(range: LineRange, view: View) {
 
         this.previousLine = view.getLineAt(range.start - 1);
-        this.nextLine = view.getLineAt(range.end);
+        this.nextLine = view.getLineAt(range.end + 1);
 
         // Default values
         this.isInDialogue = false;
@@ -62,6 +62,11 @@ export class LineRange {
     includes(range: LineRange): boolean {
         return (this.start <= range.start &&
             this.end >= range.end);
+    }
+
+    includesIndex(index: number): boolean {
+        return (this.start <= index &&
+            this.end >= index);
     }
 
     extend(range: LineRange): LineRange {

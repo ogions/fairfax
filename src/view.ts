@@ -90,7 +90,7 @@ export class View {
 
     getTextInRange(range: LineRange): string {
         const rangeText: string[] = [];
-        for (let i = range.start; i < range.end; i++) {
+        for (let i = range.start; i <= range.end; i++) {
             const line = this.getLineAt(i);
             if (line) rangeText.push(this.getTextInLine(line));
         }
@@ -139,7 +139,7 @@ export class View {
              * if there are more blocks than there are lines in the range), we
              * need to add new lines following the range.
              */
-            if (lineIndex >= range.end) {
+            if (lineIndex > range.end) {
                 this.insertLineAt(lineIndex);
             }
 

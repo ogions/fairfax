@@ -2,10 +2,11 @@
 (() => {
   // ../fairfax/src/blocks.ts
   var Document = class {
-    constructor(titlePage, blocks, multilines) {
+    constructor(titlePage, blocks, activeMultilines, openMultilines) {
       this.titlePage = titlePage;
       this.blocks = blocks;
-      this.multilines = multilines;
+      this.activeMultilines = activeMultilines;
+      this.openMultilines = openMultilines;
     }
   };
   var Block = class {
@@ -21,10 +22,12 @@
     }
   };
   var MultilineStructure = class {
-    constructor(type, start, end) {
+    constructor(type, start, startToken, endLine, endToken) {
       this.type = type;
-      this.start = start;
-      this.end = end;
+      this.startLine = start;
+      this.startToken = startToken;
+      this.endLine = endLine;
+      this.endToken = endToken;
     }
   };
 
@@ -458,21 +461,27 @@
         [20 /* NoteOpen */, 1 /* Note */],
         [21 /* NoteClose */, 1 /* Note */]
       ]);
-      this.openMultilines = /* @__PURE__ */ new Set();
-      this.openMultilineStarts = /* @__PURE__ */ new Map();
+      this.openMultilines = [];
       this.activeMultilines = /* @__PURE__ */ new Set();
     }
     reset() {
-      this.openMultilines = /* @__PURE__ */ new Set();
-      this.openMultilineStarts = /* @__PURE__ */ new Map();
+      this.openMultilines = [];
+      this.activeMultilines = /* @__PURE__ */ new Set();
     }
     manage(token, blocks, runs, lineIndex, tokenIndex) {
       const type = this.multilineTypes.get(token.type);
       if (typeof type === "undefined") return;
-      if (this.isCloser(token) && this.openMultilines.has(type)) {
-        this.closeMultiline(type, blocks, runs, lineIndex, tokenIndex);
+      if (this.isCloser(token)) {
+        for (let i = this.openMultilines.length - 1; i >= 0; i--) {
+          const multiline = this.openMultilines[i];
+          if (type === multiline.type) {
+            this.closeMultiline(multiline, i, blocks, runs, lineIndex, tokenIndex);
+            return;
+          }
+        }
+        this.openMultiline(type, void 0, void 0, lineIndex, tokenIndex);
       }
-      if (this.isOpener(token) && !this.openMultilines.has(type)) {
+      if (this.isOpener(token)) {
         this.openMultiline(type, lineIndex, tokenIndex);
       }
     }
@@ -482,39 +491,51 @@
     isOpener(token) {
       return token.type === 22 /* BoneyardOpen */ || token.type === 20 /* NoteOpen */;
     }
-    openMultiline(type, lineIndex, tokenIndex) {
-      this.openMultilines.add(type);
-      if (!this.openMultilineStarts.has(type)) {
-        this.openMultilineStarts.set(type, [lineIndex, tokenIndex + 1]);
+    openMultiline(type, startLine, startToken, endLine, endToken) {
+      if (typeof startLine !== "undefined" && typeof startToken !== "undefined") {
+        this.openMultilines.push(new MultilineStructure(
+          type,
+          startLine,
+          startToken + 1
+        ));
+      }
+      if (typeof endLine !== "undefined" && typeof endToken !== "undefined") {
+        this.openMultilines.push(new MultilineStructure(
+          type,
+          void 0,
+          void 0,
+          endLine,
+          endToken - 1
+        ));
       }
     }
-    closeMultiline(type, blocks, runs, lineIndex, tokenIndex) {
-      const [lineStart, tokenStart] = this.openMultilineStarts.get(type);
-      const style = this.multilineStyles.get(type);
+    closeMultiline(multiline, multilineIndex, blocks, runs, lineIndex, tokenIndex) {
+      const style = this.multilineStyles.get(multiline.type);
+      console.log("Closing multiline");
+      const startLineIndex = typeof multiline.startLine === "undefined" ? lineIndex : multiline.startLine;
+      const tokenStartIndex = typeof multiline.startToken === "undefined" ? tokenIndex : multiline.startToken;
+      const endLineIndex = typeof multiline.endLine === "undefined" ? lineIndex : multiline.endLine;
+      const tokenEndIndex = typeof multiline.endToken === "undefined" ? tokenIndex : multiline.endToken;
       if (typeof style === "undefined") return;
-      for (let i = lineStart + 1; i < lineIndex; i++) {
+      for (let i = startLineIndex + 1; i < endLineIndex; i++) {
         for (let run of blocks[i].runs) {
           run.styles.add(style);
         }
       }
-      const startLine = blocks[lineStart];
-      startLine.runs[tokenStart - 1].styles.add(6 /* Special */);
-      for (let i = tokenStart; i < startLine.runs.length; i++) {
-        startLine.runs[i].styles.add(style);
+      if (startLineIndex < endLineIndex) {
+        const startLine = blocks[startLineIndex];
+        startLine.runs[tokenStartIndex - 1].styles.add(6 /* Special */);
+        for (let i = tokenStartIndex; i < startLine.runs.length; i++) {
+          startLine.runs[i].styles.add(style);
+        }
       }
-      for (let i = 0; i < tokenIndex; i++) {
+      for (let i = 0; i < tokenEndIndex; i++) {
         runs[i].styles.add(style);
       }
-      runs[tokenIndex].styles.add(6 /* Special */);
-      this.openMultilines.delete(type);
-      this.openMultilineStarts.delete(type);
-      this.activeMultilines.add(
-        new MultilineStructure(
-          type,
-          lineStart,
-          lineIndex
-        )
-      );
+      runs[tokenEndIndex].styles.add(6 /* Special */);
+      multiline.endLine = endLineIndex;
+      this.openMultilines.splice(multilineIndex, 1);
+      this.activeMultilines.add(multiline);
     }
   };
 
@@ -633,6 +654,7 @@
       );
       const tokens = this.lexer.lex(chunk, lexerOptions);
       const blocks = [];
+      this.mlManager.reset();
       const titlePage = /* @__PURE__ */ new Map();
       for (let [i, token] of tokens.entries()) {
         const blockType = this.typeMap.get(token.type) ?? 2 /* Action */;
@@ -656,14 +678,12 @@
         this.openKey = "";
         this.openValue = [];
       }
-      console.log(this.mlManager.openMultilines);
-      for (let type of this.mlManager.openMultilines) {
-        const start = this.mlManager.openMultilineStarts.get(type);
-        const multiline = new MultilineStructure(type, start);
-        this.mlManager.activeMultilines.add(multiline);
-      }
-      this.mlManager.reset();
-      return new Document(titlePage, blocks, this.mlManager.activeMultilines);
+      return new Document(
+        titlePage,
+        blocks,
+        this.mlManager.activeMultilines,
+        this.mlManager.openMultilines
+      );
     }
     parseInnerTokens(tokens, blocks, lineIndex) {
       const runs = [];
@@ -699,7 +719,7 @@
   var RangeContext = class {
     constructor(range, view) {
       this.previousLine = view.getLineAt(range.start - 1);
-      this.nextLine = view.getLineAt(range.end);
+      this.nextLine = view.getLineAt(range.end + 1);
       this.isInDialogue = false;
       this.nextLineIsBlank = true;
       this.previousLineIsBlank = true;
@@ -732,6 +752,9 @@
     includes(range) {
       return this.start <= range.start && this.end >= range.end;
     }
+    includesIndex(index) {
+      return this.start <= index && this.end >= index;
+    }
     extend(range) {
       const start = Math.min(this.start, range.start);
       const end = Math.max(this.end, range.end);
@@ -746,37 +769,98 @@
       this.range = range;
     }
   };
+  var MultilineEnd = class {
+    constructor(type, start, end) {
+      this.type = type;
+      this.start = start;
+      this.end = end;
+    }
+    isInRange(range) {
+      if (typeof this.start === "number" && range.includesIndex(this.start)) {
+        return true;
+      }
+      if (typeof this.end === "number" && range.includesIndex(this.end)) {
+        return true;
+      }
+      return false;
+    }
+  };
   var MultilineManager2 = class {
     constructor(container2) {
-      this.activeRanges = [];
+      this.activeRanges = /* @__PURE__ */ new Set();
+      this.openEnds = [];
       this.container = container2;
     }
-    readStructures(multilines) {
-      this.activeRanges = [];
-      for (let multiline of multilines) {
-        if (typeof multiline.start === "undefined" && typeof multiline.end !== "undefined") {
-          this.activeRanges.push(
-            new MultilineRange(
-              multiline.type,
-              new LineRange(0, multiline.end)
-            )
-          );
-        } else if (typeof multiline.start !== "undefined" && typeof multiline.end === "undefined") {
-          this.activeRanges.push(
-            new MultilineRange(
-              multiline.type,
-              new LineRange(multiline.start, this.container.children.length - 1)
-            )
-          );
-        } else if (typeof multiline.start !== "undefined" && typeof multiline.end !== "undefined") {
-          this.activeRanges.push(
-            new MultilineRange(
-              multiline.type,
-              new LineRange(multiline.start, multiline.end)
-            )
-          );
+    manage(fairfaxDocument, range) {
+      for (let activeRange of this.activeRanges) {
+        if (range.includes(activeRange.range)) {
+          this.activeRanges.delete(activeRange);
         }
       }
+      for (let i = this.openEnds.length - 1; i >= 0; i--) {
+        const openEnd = this.openEnds[i];
+        if (openEnd.isInRange(range)) {
+          this.openEnds.splice(i, 1);
+        }
+      }
+      for (let activeMultiline of fairfaxDocument.activeMultilines) {
+        if (typeof activeMultiline.startLine === "undefined" || typeof activeMultiline.endLine === "undefined") continue;
+        this.activeRanges.add(new MultilineRange(
+          activeMultiline.type,
+          new LineRange(activeMultiline.startLine + range.start, activeMultiline.endLine + range.start)
+        ));
+      }
+      for (let openMultiline of fairfaxDocument.openMultilines) {
+        if (typeof openMultiline.startLine === "undefined") {
+          if (typeof openMultiline.endLine === "undefined") continue;
+          const end = new MultilineEnd(
+            openMultiline.type,
+            void 0,
+            openMultiline.endLine + range.start
+          );
+          this.tryClosing(end);
+        }
+        if (typeof openMultiline.endLine === "undefined") {
+          if (typeof openMultiline.startLine === "undefined") continue;
+          const end = new MultilineEnd(
+            openMultiline.type,
+            openMultiline.startLine + range.start
+          );
+          this.tryClosing(end);
+        }
+      }
+      console.log(this);
+    }
+    tryClosing(end) {
+      if (typeof end.start === "undefined") {
+        if (typeof end.end === "undefined") return;
+        for (let i = this.openEnds.length - 1; i >= 0; i--) {
+          const otherEnd = this.openEnds[i];
+          if (end.type === otherEnd.type && typeof otherEnd.start !== "undefined" && otherEnd.start < end.end) {
+            this.close(otherEnd, end, i);
+            return;
+          }
+        }
+      }
+      if (typeof end.end === "undefined") {
+        if (typeof end.start === "undefined") return;
+        for (let i = 0; i < this.openEnds.length; i++) {
+          const otherEnd = this.openEnds[i];
+          if (end.type === otherEnd.type && typeof otherEnd.end !== "undefined" && otherEnd.end >= end.start) {
+            this.close(end, otherEnd, i);
+            return;
+          }
+        }
+      }
+      this.openEnds.push(end);
+    }
+    close(start, end, index) {
+      if (typeof start.start === "undefined" || typeof end.end === "undefined") return;
+      this.openEnds.splice(index, 1);
+      this.activeRanges.add(new MultilineRange(
+        start.type,
+        new LineRange(start.start, end.end)
+      ));
     }
   };
 
@@ -907,7 +991,7 @@
     }
     getTextInRange(range) {
       const rangeText = [];
-      for (let i = range.start; i < range.end; i++) {
+      for (let i = range.start; i <= range.end; i++) {
         const line = this.getLineAt(i);
         if (line) rangeText.push(this.getTextInLine(line));
       }
@@ -933,7 +1017,7 @@
           lineIndex = this.container.children.length;
           this.insertLineAt(lineIndex);
         }
-        if (lineIndex >= range.end) {
+        if (lineIndex > range.end) {
           this.insertLineAt(lineIndex);
         }
         let line = this.getLineAt(lineIndex);
@@ -989,16 +1073,11 @@
     updateLine(line, isOrigin) {
       const lineIndex = this.view.getLineIndex(line);
       if (typeof lineIndex !== "undefined") {
-        this.updateRange(new LineRange(lineIndex, lineIndex + 1), isOrigin);
+        this.updateRange(new LineRange(lineIndex, lineIndex), isOrigin);
       }
     }
     updateRange(range, isOrigin) {
-      for (let multiline of this.mlManager.activeRanges) {
-        if (range.overlaps(multiline.range) && !range.includes(multiline.range)) {
-          this.updateRange(range.extend(multiline.range));
-          return;
-        }
-      }
+      console.log("Updating range " + range.start + ", " + range.end);
       const text = this.view.getTextInRange(range);
       const context = new RangeContext(range, this.view);
       const parserOptions = new ParserOptions(
@@ -1009,8 +1088,14 @@
       );
       const [firstLineStartingClass, lastLineStartingClass] = this.getBorderClasses(range);
       const fairfaxDocument = this.parser.parse(text, parserOptions);
-      console.log(fairfaxDocument.multilines);
-      this.mlManager.readStructures(fairfaxDocument.multilines);
+      this.mlManager.manage(fairfaxDocument, range);
+      for (let multiline of this.mlManager.activeRanges) {
+        if (range.overlaps(multiline.range) && !range.includes(multiline.range)) {
+          console.log("Overlapping multiline detected");
+          this.updateRange(range.extend(multiline.range), true);
+          return;
+        }
+      }
       const shouldRewrite = isOrigin || false;
       this.view.updateRange(range, fairfaxDocument.blocks, shouldRewrite);
       const [firstLineEndingClass, lastLineEndingClass] = this.getBorderClasses(range);
@@ -1024,7 +1109,7 @@
     }
     getBorderClasses(range) {
       const firstLine = this.view.getLineAt(range.start);
-      const lastLine = this.view.getLineAt(range.end - 1);
+      const lastLine = this.view.getLineAt(range.end);
       const firstLineClass = firstLine ? firstLine.className : void 0;
       const lastLineClass = lastLine ? lastLine.className : void 0;
       return [firstLineClass, lastLineClass];

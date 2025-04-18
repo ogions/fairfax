@@ -40,22 +40,13 @@ export class Editor {
     updateLine(line: HTMLElement, isOrigin?: boolean) {
         const lineIndex = this.view.getLineIndex(line);
         if (typeof lineIndex !== "undefined") {
-            this.updateRange(new LineRange(lineIndex, lineIndex + 1), isOrigin)
+            this.updateRange(new LineRange(lineIndex, lineIndex), isOrigin)
         }
     }
 
     updateRange(range: LineRange, isOrigin?: boolean) {
-
-        /* If this range overlaps with any active multiline ranges, then we
-         * should parse that entire range along with this one.
-         */
-        for (let multiline of this.mlManager.activeRanges) {
-            if (range.overlaps(multiline.range) &&
-                !range.includes(multiline.range)) {
-                this.updateRange(range.extend(multiline.range));
-                return;
-            }
-        }
+        
+        console.log("Updating range " + range.start + ", " + range.end);
 
         const text = this.view.getTextInRange(range);
 
@@ -75,8 +66,20 @@ export class Editor {
         // Use Fairfax to parse the full text
         const fairfaxDocument = this.parser.parse(text, parserOptions);
 
-        console.log(fairfaxDocument.multilines);
-        this.mlManager.readStructures(fairfaxDocument.multilines);
+        // Get multiline info from the document
+        this.mlManager.manage(fairfaxDocument, range);
+        
+        /* If this range overlaps with any active multiline ranges, then we
+         * should parse that entire range along with this one.
+         */
+        for (let multiline of this.mlManager.activeRanges) {
+            if (range.overlaps(multiline.range) &&
+                !range.includes(multiline.range)) {
+                console.log("Overlapping multiline detected")
+                this.updateRange(range.extend(multiline.range), true);
+                return;
+            }
+        }
 
         // Render the blocks into the View
         const shouldRewrite = isOrigin || false;
@@ -104,7 +107,7 @@ export class Editor {
 
     getBorderClasses(range: LineRange): [string | undefined, string | undefined] {
         const firstLine = this.view.getLineAt(range.start);
-        const lastLine = this.view.getLineAt(range.end - 1);
+        const lastLine = this.view.getLineAt(range.end);
         const firstLineClass = firstLine ? firstLine.className : undefined;
         const lastLineClass = lastLine ? lastLine.className : undefined;
         return [firstLineClass, lastLineClass];
