@@ -1,18 +1,20 @@
 import { Parser, ParserOptions } from "fairfax";
+import { MultilineManager } from "./multiline";
 import { RangeContext, LineRange } from "./range";
 import { View } from "./view";
 
 export class Editor {
     container: HTMLElement;
+    mlManager: MultilineManager;
     parser = new Parser();
     view: View;
-    openMultilines = new Map();
 
     constructor(container: HTMLElement) {
         this.container = container;
         this.container.setAttribute("contenteditable", "true");
         this.container.addEventListener("input", (e) => this.handleInput(e));
 
+        this.mlManager = new MultilineManager(container);
         this.view = new View(container);
     }
 
@@ -44,26 +46,18 @@ export class Editor {
 
     updateRange(range: LineRange, isOrigin?: boolean) {
 
-        /* Gather text for the parser. If anything in this range could close an
-         * open multiline, then we should reparse the entire open range.
+        /* If this range overlaps with any active multiline ranges, then we
+         * should parse that entire range along with this one.
          */
+        for (let multiline of this.mlManager.activeRanges) {
+            if (range.overlaps(multiline.range) &&
+                !range.includes(multiline.range)) {
+                this.updateRange(range.extend(multiline.range));
+                return;
+            }
+        }
+
         const text = this.view.getTextInRange(range);
-        if (this.openMultilines.has("Boneyard") && text.includes("*/")) {
-            const start = this.openMultilines.get("Boneyard");
-            if (start < range.start) {
-                this.updateRange(new LineRange(start, range.end), true);
-                this.openMultilines.delete("Boneyard");
-                return;
-            }
-        }
-        if (this.openMultilines.has("Note") && text.includes("]]")) {
-            const start = this.openMultilines.get("Note");
-            if (start < range.start) {
-                this.updateRange(new LineRange(start, range.end), true);
-                this.openMultilines.delete("Note");
-                return;
-            }
-        }
 
         /* Collect context from neighboring lines to feed as options into the
          * parser. We also need to save the classes of the first and last lines
@@ -80,7 +74,9 @@ export class Editor {
 
         // Use Fairfax to parse the full text
         const fairfaxDocument = this.parser.parse(text, parserOptions);
-        console.log(fairfaxDocument.titlePage);
+
+        console.log(fairfaxDocument.multilines);
+        this.mlManager.readStructures(fairfaxDocument.multilines);
 
         // Render the blocks into the View
         const shouldRewrite = isOrigin || false;
@@ -98,14 +94,6 @@ export class Editor {
             lastLineStartingClass != lastLineEndingClass) {
 
             this.updateNeighbors(context);
-        }
-
-        /* If any multilines have been opened, we need to track those. */ 
-        if (text.includes("/*") && !text.includes("*/")) {
-            this.openMultilines.set("Boneyard", range.start);
-        }
-        if (text.includes("[[") && !text.includes("]]")) {
-            this.openMultilines.set("Note", range.start);
         }
     }
 

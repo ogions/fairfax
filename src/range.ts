@@ -42,7 +42,31 @@ export class LineRange {
     end: number;
 
     constructor(start: number, end: number) {
-        this.start = start;
-        this.end = end;
+        /* This ensures that the range is well-formed by flipping the start
+         * and end parameters if the start is greater than the end.
+         */
+        if (start <= end) {
+            this.start = start;
+            this.end = end;
+        } else {
+            this.start = end;
+            this.end = start;
+        }
+    }
+
+    overlaps(range: LineRange): boolean {
+        return (this.start <= range.end &&
+            range.start <= this.end)
+    }
+
+    includes(range: LineRange): boolean {
+        return (this.start <= range.start &&
+            this.end >= range.end);
+    }
+
+    extend(range: LineRange): LineRange {
+        const start = Math.min(this.start, range.start);
+        const end = Math.max(this.end, range.end);
+        return new LineRange(start, end);
     }
 }
