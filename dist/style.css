@@ -16,12 +16,24 @@ main {
     margin-left: 50%;
 }
 
+.Character.Dual {
+    margin-left: 60%;
+}
+
 .Dialogue {
     margin-left: 25%;
 }
 
+.Dialogue.Dual {
+    margin-left: 35%;
+}
+
 .Parenthetical {
     margin-left: 37%;
+}
+
+.Parenthetical.Dual {
+    margin-left: 47%;
 }
 
 .Transition {

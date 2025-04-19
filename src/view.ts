@@ -39,7 +39,7 @@ export class View {
     }
 
     resetContainer() {
-        this.container.innerHTML = "<div><br></div>";
+        this.container.innerHTML = '<div class="from-reset"><br></div>';
         const selection = document.getSelection();
         if (selection) selection.setPosition(this.container.children[0]);
     }
@@ -82,6 +82,7 @@ export class View {
         if (i < 0) i = 0;
         const targetLine = this.getLineAt(i);
         const newLine = document.createElement("div");
+        newLine.classList.add("from-insert");
         if (targetLine) {
             targetLine.before(newLine);
         } else {
@@ -102,14 +103,23 @@ export class View {
 
         /* In the case of a copy/paste or other accidental document
          * malformation, we could have line elements nested inside of each
-         * other. The parser can handle this as long as we collect the text
-         * with newlines included between those sub-elements.
+         * other. The parser rewrites these properly as long as we collect
+         * the text with newlines included between those sub-elements.
          */
         let lineText = "";
-        for (let childNode of line.childNodes) {
+        for (let i = 0; i < line.childNodes.length; i++) {
+            const childNode = line.childNodes[i];
+            /* If the child node is another line, we recursively add its text
+             * contents to the collected text. If the next child node is
+             * also a sub-line, rather than  text node or line break, then we
+             * also add a newline to separate them.
+             */
             if (childNode.nodeName === "DIV") {
-                lineText += "\n";
                 lineText += this.getTextInLine(childNode as HTMLElement);
+                if (line.childNodes[i + 1] &&
+                    line.childNodes[i + 1].nodeName === "DIV") {
+                    lineText += "\n";
+                }
             } else {
                 lineText += childNode.textContent;
             }
@@ -134,13 +144,12 @@ export class View {
             if (lineIndex >= this.container.children.length) {
                 lineIndex = this.container.children.length;
                 this.insertLineAt(lineIndex);
-            }
-
-            /* If the desired index is outside the targeted range (for example,
-             * if there are more blocks than there are lines in the range), we
-             * need to add new lines following the range.
-             */
-            if (lineIndex > range.end) {
+            } else if (lineIndex > range.end) {
+                /* If the desired index is outside the targeted range (for example,
+                 * if there are more blocks than there are lines in the range), we
+                 * need to add new lines following the range to avoid overwriting
+                 * other lines.
+                 */
                 this.insertLineAt(lineIndex);
             }
 
@@ -154,7 +163,7 @@ export class View {
             if (!line) return;
 
             if (shouldRewrite) this.writeLine(line, block);
-            this.classLine(line, block.type);
+            this.classLine(line, block);
         }
         if (shouldRewrite) this.selection.render();
     }
@@ -186,8 +195,11 @@ export class View {
         if (line.textContent === "") line.innerHTML = "<br>";
     }
     
-    classLine(line: HTMLElement, type: BlockType) {
-        const lineClass = this.blockMap.get(type) ?? "Action";
+    classLine(line: HTMLElement, block: Block) {
+        const lineClass = this.blockMap.get(block.type) ?? "Action";
         line.className = lineClass;
+        if (block.isDual) {
+            line.classList.add("Dual");
+        }
     }
 }

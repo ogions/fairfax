@@ -6,6 +6,7 @@ import { View } from "./view";
 export class Editor {
     container: HTMLElement;
     mlManager: MultilineManager;
+    updateCount = 0;
     parser = new Parser();
     view: View;
 
@@ -14,11 +15,12 @@ export class Editor {
         this.container.setAttribute("contenteditable", "true");
         this.container.addEventListener("input", (e) => this.handleInput(e as InputEvent));
 
-        this.mlManager = new MultilineManager(container);
         this.view = new View(container);
+        this.mlManager = new MultilineManager(this.view);
     }
 
     handleInput(e: InputEvent) {
+        this.updateCount = 0;
         let activeLine = this.view.getActiveLine();
 
         /* If there are no more child lines in the main container, then we
@@ -45,6 +47,13 @@ export class Editor {
     }
 
     updateLine(line: HTMLElement, isOrigin?: boolean) {
+        /* If this is a dual dialogue character, we need to rewrite it to add
+         * the special dual dialogue flag.
+         */
+        if (line.classList.contains("Dual") && line.classList.contains("Character")) {
+            isOrigin = true;
+        }
+
         const lineIndex = this.view.getLineIndex(line);
         if (typeof lineIndex !== "undefined") {
             this.updateRange(new LineRange(lineIndex, lineIndex), isOrigin)
@@ -52,26 +61,39 @@ export class Editor {
     }
 
     updateRange(range: LineRange, isOrigin?: boolean) {
+        this.updateCount += 1;
+        if (this.updateCount > 99) return;
         
         const text = this.view.getTextInRange(range);
 
-        /* Collect context from neighboring lines to feed as options into the
-         * parser. We also need to save the classes of the first and last lines
-         * so we can compare them to the updated classes later.
-         */
+        // Collect context from neighboring lines
         const context = new RangeContext(range, this.view);
+        
+        /* Copying and pasting sometimes adds an unwanted line break element
+         * following the pasted text. We check if this is the case, and if so,
+         * remove it and redo the update.
+         */
+        if (context.nextLine && context.nextLine.tagName === "BR") {
+            context.nextLine.remove();
+            this.updateRange(range, isOrigin);
+            return;
+        }
+
+        /* We feed context as options into the parser. We also need to save
+         * the classes of the first and last lines so we can compare them to
+         * the updated classes later.
+         */
         const parserOptions = new ParserOptions(
             context.isDocumentStart,
             context.isInDialogue,
+            context.isInDualDialogue,
             context.nextLineIsBlank,
             context.previousLineIsBlank
         );
         const [firstLineStartingClass, lastLineStartingClass] = this.getBorderClasses(range);
 
-        // Use Fairfax to parse the full text
+        // Use Fairfax to parse the full text and get multiline info
         const fairfaxDocument = this.parser.parse(text, parserOptions);
-
-        // Get multiline info from the document
         this.mlManager.manage(fairfaxDocument, range);
         console.log(this.mlManager.activeRanges);
         
@@ -81,6 +103,11 @@ export class Editor {
         for (let multiline of this.mlManager.activeRanges) {
             if (range.overlaps(multiline.range) &&
                 !range.includes(multiline.range)) {
+                console.log("Multiline range detected");
+                for (let activeRange of this.mlManager.activeRanges) {
+                    console.log(activeRange.range);
+                }
+                console.log(range);
                 this.updateRange(range.extend(multiline.range), true);
                 return;
             }

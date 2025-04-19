@@ -1,5 +1,6 @@
 import { Document, MultilineType } from "fairfax";
 import { LineRange } from "./range";
+import { View } from "./view";
 
 export class MultilineRange {
     type: MultilineType;
@@ -36,12 +37,12 @@ export class MultilineEnd {
 }
 
 export class MultilineManager {
-    container: HTMLElement;
     activeRanges: Set<MultilineRange> = new Set();
     openEnds: MultilineEnd[] = [];
+    view: View;
 
-    constructor(container: HTMLElement) {
-        this.container = container;
+    constructor(view: View) {
+        this.view = view;
     }
 
     manage(fairfaxDocument: Document, range: LineRange) {
@@ -135,7 +136,19 @@ export class MultilineManager {
 
     insertLine(index: number) {
         for (let range of this.activeRanges) {
+
+            /* We can't keep extending the title page, or else it will extend
+             * over the full document. If we're leaving a blank line, we don't
+             * update the range.
+            if (range.type === MultilineType.TitlePage) {
+                const previousLine = this.view.getLineAt(index - 1);
+                if (previousLine && previousLine.classList.contains("BlankLine")) {
+                    continue;
+                }
+            }
+             */
             if (range.range.includesIndex(index)) {
+                console.log("Extending multiline");
                 range.range.end += 1;
             }
         }

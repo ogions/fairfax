@@ -4,6 +4,7 @@ export class RangeContext {
 
     isDocumentStart: boolean;
     isInDialogue: boolean;
+    isInDualDialogue: boolean;
     nextLineIsBlank: boolean;
     previousLineIsBlank: boolean;
     nextLine: HTMLElement | undefined;
@@ -17,6 +18,7 @@ export class RangeContext {
         // Default values
         this.isDocumentStart = false;
         this.isInDialogue = false;
+        this.isInDualDialogue = false;
         this.nextLineIsBlank = true;
         this.previousLineIsBlank = true;
 
@@ -27,6 +29,10 @@ export class RangeContext {
 
                 this.isInDialogue = true;
                 this.previousLineIsBlank = false;
+
+                if (this.previousLine.classList.contains("Dual")) {
+                    this.isInDualDialogue = true;
+                }
             } else {
                 this.previousLineIsBlank = this.previousLine.classList.contains("BlankLine");
             }

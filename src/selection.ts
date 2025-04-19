@@ -24,6 +24,20 @@ export class ViewSelection {
         if (anchor.parentElement && anchor.parentElement.tagName === "SPAN") {
             anchor = anchor.parentElement;
         }
+
+        /* In some cases, the anchor might be the line element itself, so we
+         * take the combined offset of all previous nodes.
+         */
+        if (anchor.nodeName === "DIV") {
+            let offset = 0;
+            for (let i = 0; i < selection.anchorOffset; i++) {
+                const childText = anchor.childNodes[i].textContent;
+                if (childText) offset += childText.length;
+            }
+            this.offset = offset;
+            return;
+        }
+
         let offset = 0;
         for (let childNode of activeLine.childNodes) {
             if (childNode === anchor) {

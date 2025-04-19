@@ -10,9 +10,10 @@
     }
   };
   var Block = class {
-    constructor(type, runs) {
+    constructor(type, runs, isDual) {
       this.type = type;
       this.runs = runs;
+      if (isDual) this.isDual = isDual;
     }
   };
   var Run = class {
@@ -256,11 +257,11 @@
       if (lexer.previousLineIsBlank && !lexer.nextLineIsBlank && this.regexes.character.test(line)) {
         if (line.endsWith("^")) {
           const tokens = [
+            ...lexer.lexLine(line.slice(0, -1)),
             new Token(
               11 /* DualDialogue */,
               "^"
-            ),
-            ...lexer.lexLine(line.slice(-1))
+            )
           ];
           return new Token(
             7 /* Character */,
@@ -448,6 +449,20 @@
       this.endLine = endLine;
       this.endToken = endToken;
     }
+    isWithin(multiline) {
+      if (typeof multiline.startLine === "undefined" || typeof multiline.startToken === "undefined" || typeof multiline.endLine === "undefined" || typeof multiline.endToken === "undefined") {
+        return false;
+      }
+      if (typeof this.startLine !== "undefined" && typeof this.startToken !== "undefined") {
+        if (this.startLine > multiline.startLine && this.startLine < multiline.endLine) return true;
+        if (this.startLine === multiline.startLine && this.startToken > multiline.startToken) return true;
+      }
+      if (typeof this.endLine !== "undefined" && typeof this.endToken !== "undefined") {
+        if (this.endLine > multiline.startLine && this.endLine < multiline.endLine) return true;
+        if (this.endLine === multiline.endLine && this.endToken < multiline.endToken) return true;
+      }
+      return false;
+    }
   };
   var MultilineManager = class {
     constructor() {
@@ -523,8 +538,19 @@
       const endLineIndex = typeof multiline.endLine === "undefined" ? lineIndex : multiline.endLine;
       const tokenEndIndex = typeof multiline.endToken === "undefined" ? tokenIndex : multiline.endToken;
       if (typeof style === "undefined") return;
+      if (multiline.type === 0 /* Boneyard */) {
+        for (let i = this.openMultilines.length - 1; i >= 0; i--) {
+          const openMultiline = this.openMultilines[i];
+          if (openMultiline.type === 1 /* Note */) {
+            if (openMultiline.isWithin(multiline)) {
+              this.openMultilines.splice(i, 1);
+            }
+          }
+        }
+      }
       for (let i = startLineIndex + 1; i < endLineIndex; i++) {
         for (let run of blocks[i].runs) {
+          run.styles.delete(5 /* Note */);
           run.styles.add(style);
         }
       }
@@ -532,10 +558,12 @@
         const startLine = blocks[startLineIndex];
         startLine.runs[tokenStartIndex - 1].styles.add(6 /* Special */);
         for (let i = tokenStartIndex; i < startLine.runs.length; i++) {
+          startLine.runs[i].styles.delete(5 /* Note */);
           startLine.runs[i].styles.add(style);
         }
       }
       for (let i = 0; i < tokenEndIndex; i++) {
+        runs[i].styles.delete(5 /* Note */);
         runs[i].styles.add(style);
       }
       runs[tokenEndIndex].styles.add(6 /* Special */);
@@ -545,16 +573,14 @@
     }
     openTitlePage() {
       this.hasOpenTitlePage = true;
-      console.log("Title page open");
     }
     closeTitlePage(index) {
-      console.log("Titel page closed");
       this.hasOpenTitlePage = false;
       this.activeMultilines.add(new MultilineStructure(
         2 /* TitlePage */,
         0,
         void 0,
-        index + 1
+        index
       ));
     }
   };
@@ -593,7 +619,7 @@
       this.openStyleStarts = /* @__PURE__ */ new Map();
     }
     stylize(token, runs, tokenIndex) {
-      if (token.type === 2 /* SceneHeadingForce */ || token.type === 4 /* SceneNumberFence */ || token.type === 6 /* ActionForce */ || token.type === 8 /* CharacterForce */ || token.type === 13 /* LyricLeader */ || token.type === 15 /* TransitionForce */ || token.type === 25 /* SectionHeadingLeader */ || token.type === 27 /* SynopsisLeader */) {
+      if (token.type === 2 /* SceneHeadingForce */ || token.type === 4 /* SceneNumberFence */ || token.type === 6 /* ActionForce */ || token.type === 8 /* CharacterForce */ || token.type === 11 /* DualDialogue */ || token.type === 13 /* LyricLeader */ || token.type === 15 /* TransitionForce */ || token.type === 25 /* SectionHeadingLeader */ || token.type === 27 /* SynopsisLeader */) {
         return /* @__PURE__ */ new Set([6 /* Special */]);
       }
       if (token.type === 29 /* TitlePageKey */) {
@@ -641,12 +667,12 @@
 
   // ../fairfax/src/parser.ts
   var ParserOptions = class {
-    constructor(isDocumentStart, isInDialogue, nextLineIsBlank, previousLineIsBlank, includeMarkup) {
+    constructor(isDocumentStart, isInDialogue, isInDualDialogue, nextLineIsBlank, previousLineIsBlank) {
       this.isDocumentStart = isDocumentStart ?? false;
       this.isInDialogue = isInDialogue ?? false;
+      this.isInDualDialogue = isInDualDialogue ?? false;
       this.nextLineIsBlank = nextLineIsBlank ?? true;
       this.previousLineIsBlank = previousLineIsBlank ?? true;
-      this.includeMarkup = includeMarkup ?? false;
     }
   };
   var Parser = class {
@@ -668,6 +694,7 @@
         [26 /* Synopsis */, 10 /* Synopsis */],
         [28 /* TitlePage */, 11 /* TitlePage */]
       ]);
+      this.isInDualDialogue = false;
       this.openKey = "";
       this.openValue = [];
     }
@@ -679,9 +706,9 @@
         options.previousLineIsBlank
       );
       const tokens = this.lexer.lex(chunk, lexerOptions);
-      console.log(tokens);
       const blocks = [];
       this.mlManager.reset();
+      this.isInDualDialogue = options.isInDualDialogue;
       const titlePage = /* @__PURE__ */ new Map();
       for (let [i, token] of tokens.entries()) {
         const blockType = this.typeMap.get(token.type) ?? 2 /* Action */;
@@ -698,9 +725,14 @@
             this.mlManager.openTitlePage();
           } else if (blockType === 0 /* BlankLine */) {
             if (this.mlManager.hasOpenTitlePage) this.mlManager.closeTitlePage(i);
+            this.isInDualDialogue = false;
           }
           const runs = this.parseInnerTokens(token.content, blocks, i);
-          blocks.push(new Block(blockType, runs));
+          if (this.isInDualDialogue) {
+            blocks.push(new Block(blockType, runs, true));
+          } else {
+            blocks.push(new Block(blockType, runs));
+          }
         }
       }
       if (this.openKey) {
@@ -709,7 +741,7 @@
         this.openValue = [];
       }
       if (this.mlManager.hasOpenTitlePage) {
-        this.mlManager.closeTitlePage(blocks.length);
+        this.mlManager.closeTitlePage(blocks.length - 1);
       }
       return new Document(
         titlePage,
@@ -721,6 +753,9 @@
     parseInnerTokens(tokens, blocks, lineIndex) {
       const runs = [];
       for (let [i, token] of tokens.entries()) {
+        if (token.type === 11 /* DualDialogue */) {
+          this.isInDualDialogue = true;
+        }
         const text = typeof token.content === "string" ? token.content : "";
         const styles = this.stylizer.stylize(token, runs, i);
         runs.push(new Run(text, styles));
@@ -755,12 +790,16 @@
       this.nextLine = view.getLineAt(range.end + 1);
       this.isDocumentStart = false;
       this.isInDialogue = false;
+      this.isInDualDialogue = false;
       this.nextLineIsBlank = true;
       this.previousLineIsBlank = true;
       if (this.previousLine) {
         if (this.previousLine.classList.contains("Character") || this.previousLine.classList.contains("Dialogue") || this.previousLine.classList.contains("Parenthetical")) {
           this.isInDialogue = true;
           this.previousLineIsBlank = false;
+          if (this.previousLine.classList.contains("Dual")) {
+            this.isInDualDialogue = true;
+          }
         } else {
           this.previousLineIsBlank = this.previousLine.classList.contains("BlankLine");
         }
@@ -822,10 +861,10 @@
     }
   };
   var MultilineManager2 = class {
-    constructor(container2) {
+    constructor(view) {
       this.activeRanges = /* @__PURE__ */ new Set();
       this.openEnds = [];
-      this.container = container2;
+      this.view = view;
     }
     manage(fairfaxDocument, range) {
       for (let activeRange of this.activeRanges) {
@@ -922,6 +961,15 @@
       if (anchor.parentElement && anchor.parentElement.tagName === "SPAN") {
         anchor = anchor.parentElement;
       }
+      if (anchor.nodeName === "DIV") {
+        let offset2 = 0;
+        for (let i = 0; i < selection.anchorOffset; i++) {
+          const childText = anchor.childNodes[i].textContent;
+          if (childText) offset2 += childText.length;
+        }
+        this.offset = offset2;
+        return;
+      }
       let offset = 0;
       for (let childNode of activeLine.childNodes) {
         if (childNode === anchor) {
@@ -991,7 +1039,7 @@
       this.resetContainer();
     }
     resetContainer() {
-      this.container.innerHTML = "<div><br></div>";
+      this.container.innerHTML = '<div class="from-reset"><br></div>';
       const selection = document.getSelection();
       if (selection) selection.setPosition(this.container.children[0]);
     }
@@ -1026,6 +1074,7 @@
       if (i < 0) i = 0;
       const targetLine = this.getLineAt(i);
       const newLine = document.createElement("div");
+      newLine.classList.add("from-insert");
       if (targetLine) {
         targetLine.before(newLine);
       } else {
@@ -1042,10 +1091,13 @@
     }
     getTextInLine(line) {
       let lineText = "";
-      for (let childNode of line.childNodes) {
+      for (let i = 0; i < line.childNodes.length; i++) {
+        const childNode = line.childNodes[i];
         if (childNode.nodeName === "DIV") {
-          lineText += "\n";
           lineText += this.getTextInLine(childNode);
+          if (line.childNodes[i + 1] && line.childNodes[i + 1].nodeName === "DIV") {
+            lineText += "\n";
+          }
         } else {
           lineText += childNode.textContent;
         }
@@ -1059,14 +1111,13 @@
         if (lineIndex >= this.container.children.length) {
           lineIndex = this.container.children.length;
           this.insertLineAt(lineIndex);
-        }
-        if (lineIndex > range.end) {
+        } else if (lineIndex > range.end) {
           this.insertLineAt(lineIndex);
         }
         let line = this.getLineAt(lineIndex);
         if (!line) return;
         if (shouldRewrite) this.writeLine(line, block);
-        this.classLine(line, block.type);
+        this.classLine(line, block);
       }
       if (shouldRewrite) this.selection.render();
     }
@@ -1089,23 +1140,28 @@
       line.appendChild(fragment);
       if (line.textContent === "") line.innerHTML = "<br>";
     }
-    classLine(line, type) {
-      const lineClass = this.blockMap.get(type) ?? "Action";
+    classLine(line, block) {
+      const lineClass = this.blockMap.get(block.type) ?? "Action";
       line.className = lineClass;
+      if (block.isDual) {
+        line.classList.add("Dual");
+      }
     }
   };
 
   // src/editor.ts
   var Editor = class {
     constructor(container2) {
+      this.updateCount = 0;
       this.parser = new Parser();
       this.container = container2;
       this.container.setAttribute("contenteditable", "true");
       this.container.addEventListener("input", (e) => this.handleInput(e));
-      this.mlManager = new MultilineManager2(container2);
       this.view = new View(container2);
+      this.mlManager = new MultilineManager2(this.view);
     }
     handleInput(e) {
+      this.updateCount = 0;
       let activeLine = this.view.getActiveLine();
       if (!activeLine && this.container.querySelectorAll("div").length === 0) {
         this.view.resetContainer();
@@ -1120,17 +1176,28 @@
       }
     }
     updateLine(line, isOrigin) {
+      if (line.classList.contains("Dual") && line.classList.contains("Character")) {
+        isOrigin = true;
+      }
       const lineIndex = this.view.getLineIndex(line);
       if (typeof lineIndex !== "undefined") {
         this.updateRange(new LineRange(lineIndex, lineIndex), isOrigin);
       }
     }
     updateRange(range, isOrigin) {
+      this.updateCount += 1;
+      if (this.updateCount > 99) return;
       const text = this.view.getTextInRange(range);
       const context = new RangeContext(range, this.view);
+      if (context.nextLine && context.nextLine.tagName === "BR") {
+        context.nextLine.remove();
+        this.updateRange(range, isOrigin);
+        return;
+      }
       const parserOptions = new ParserOptions(
         context.isDocumentStart,
         context.isInDialogue,
+        context.isInDualDialogue,
         context.nextLineIsBlank,
         context.previousLineIsBlank
       );
@@ -1140,6 +1207,11 @@
       console.log(this.mlManager.activeRanges);
       for (let multiline of this.mlManager.activeRanges) {
         if (range.overlaps(multiline.range) && !range.includes(multiline.range)) {
+          console.log("Multiline range detected");
+          for (let activeRange of this.mlManager.activeRanges) {
+            console.log(activeRange.range);
+          }
+          console.log(range);
           this.updateRange(range.extend(multiline.range), true);
           return;
         }
