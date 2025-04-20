@@ -40,7 +40,7 @@ main {
     text-align: right;
 }
 
-:has(> .Centered) {
+.Centered {
     text-align: center;
 }
 
