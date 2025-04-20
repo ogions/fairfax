@@ -10,9 +10,10 @@
     }
   };
   var Block = class {
-    constructor(type, runs, isDual) {
+    constructor(type, runs, centered, isDual) {
       this.type = type;
       this.runs = runs;
+      if (centered) this.centered = centered;
       if (isDual) this.isDual = isDual;
     }
   };
@@ -24,10 +25,32 @@
   };
 
   // ../fairfax/src/tokens.ts
-  var Token = class {
+  var BlockToken = class {
+    constructor(type, content, centered) {
+      this.type = type;
+      this.content = content;
+      if (centered) this.centered = centered;
+    }
+  };
+  var RunToken = class {
     constructor(type, content) {
       this.type = type;
       this.content = content;
+    }
+    isMultilineStyle() {
+      return this.type === 13 /* BoneyardOpen */ || this.type === 14 /* BoneyardClose */ || this.type === 11 /* NoteOpen */ || this.type === 12 /* NoteClose */;
+    }
+  };
+  var StyleToken = class extends RunToken {
+    constructor(type, content, active) {
+      super(type, content);
+      this.active = active || false;
+    }
+    isOpener() {
+      return this.type === 13 /* BoneyardOpen */ || this.type === 11 /* NoteOpen */;
+    }
+    isCloser() {
+      return this.type === 14 /* BoneyardClose */ || this.type === 12 /* NoteClose */;
     }
   };
 
@@ -48,192 +71,140 @@
   };
 
   // ../fairfax/src/tokenizer.ts
-  var Tokenizer = class {
-    constructor() {
+  var Tokenizer = class _Tokenizer {
+    static {
       this.regexes = new FountainRegexes();
     }
     tokenizeLine(line, lexer) {
       if (!line) {
-        return new Token(
+        return new BlockToken(
           0 /* BlankLine */,
-          line
-        );
-      }
-      if (lexer.isDocumentStart && this.regexes.titlePageKey.test(line)) {
-        lexer.isInTitlePage = true;
-      }
-      if (lexer.isInTitlePage) {
-        if (this.regexes.titlePageKey.test(line)) {
-          const matches = this.regexes.titlePageKey.exec(line);
-          const key = matches ? matches[1] : "";
-          const space = matches ? matches[2] : "";
-          const value = matches ? matches[3] : "";
-          const tokens = [
-            new Token(
-              29 /* TitlePageKey */,
-              key
-            ),
-            new Token(
-              34 /* Text */,
-              space
-            )
-          ];
-          if (value) {
-            tokens.push(new Token(
-              30 /* TitlePageValue */,
-              value
-            ));
-          }
-          return new Token(
-            28 /* TitlePage */,
-            tokens
-          );
-        } else {
-          const matches = this.regexes.titlePageIndentedValue.exec(line);
-          if (matches) {
-            const space = matches[1];
-            const value = matches[2];
-            const tokens = [
-              new Token(
-                34 /* Text */,
-                space
-              ),
-              new Token(
-                30 /* TitlePageValue */,
-                value
-              )
-            ];
-            return new Token(
-              28 /* TitlePage */,
-              tokens
-            );
-          }
-        }
-        return new Token(
-          28 /* TitlePage */,
-          lexer.lexLine(line)
+          []
         );
       }
       if (line.startsWith("~")) {
         const tokens = [
-          new Token(
-            13 /* LyricLeader */,
+          new RunToken(
+            6 /* LyricLeader */,
             "~"
           ),
           ...lexer.lexLine(line.slice(1))
         ];
-        return new Token(
-          12 /* Lyric */,
+        return new BlockToken(
+          6 /* Lyric */,
           tokens
         );
       }
       if (line.startsWith("@")) {
         const tokens = [
-          new Token(
-            8 /* CharacterForce */,
+          new RunToken(
+            4 /* CharacterForce */,
             "@"
           ),
           ...lexer.lexLine(line.slice(1))
         ];
-        return new Token(
-          7 /* Character */,
+        return new BlockToken(
+          3 /* Character */,
           tokens
         );
       }
       if (line.startsWith(">")) {
         if (line.endsWith("<")) {
           const tokens2 = [
-            new Token(
-              16 /* CenterLeft */,
+            new RunToken(
+              8 /* CenterLeft */,
               ">"
             ),
             ...lexer.lexLine(line.slice(1, -1)),
-            new Token(
-              17 /* CenterRight */,
+            new RunToken(
+              9 /* CenterRight */,
               "<"
             )
           ];
-          console.log("centered line");
-          return new Token(
-            5 /* Action */,
-            tokens2
+          return new BlockToken(
+            2 /* Action */,
+            tokens2,
+            true
           );
         }
         const tokens = [
-          new Token(
-            15 /* TransitionForce */,
+          new RunToken(
+            7 /* TransitionForce */,
             ">"
           ),
           ...lexer.lexLine(line.slice(1))
         ];
-        return new Token(
-          14 /* Transition */,
+        return new BlockToken(
+          7 /* Transition */,
           tokens
         );
       }
-      if (this.regexes.pageBreak.test(line)) {
-        return new Token(
-          19 /* PageBreak */,
-          line
+      if (_Tokenizer.regexes.pageBreak.test(line)) {
+        return new BlockToken(
+          8 /* PageBreak */,
+          [new RunToken(
+            22 /* Text */,
+            line
+          )]
         );
       }
       if (line.startsWith("=")) {
         const tokens = [
-          new Token(
-            27 /* SynopsisLeader */,
+          new RunToken(
+            16 /* SynopsisLeader */,
             "="
           ),
           ...lexer.lexLine(line.slice(1))
         ];
-        return new Token(
-          26 /* Synopsis */,
+        return new BlockToken(
+          10 /* Synopsis */,
           tokens
         );
       }
-      if (this.regexes.sectionHeading.test(line)) {
-        const result = this.regexes.sectionHeading.exec(line);
+      if (_Tokenizer.regexes.sectionHeading.test(line)) {
+        const result = _Tokenizer.regexes.sectionHeading.exec(line);
         const leader = result ? result[1] : "";
         const tokens = [
-          new Token(
-            25 /* SectionHeadingLeader */,
+          new RunToken(
+            15 /* SectionHeadingLeader */,
             leader
           ),
           ...lexer.lexLine(line.slice(leader.length))
         ];
-        return new Token(
-          24 /* SectionHeading */,
+        return new BlockToken(
+          9 /* SectionHeading */,
           tokens
         );
       }
-      if (this.regexes.forcedSceneHeading.test(line) || lexer.previousLineIsBlank && lexer.nextLineIsBlank && this.regexes.sceneHeading.test(line)) {
-        const result = this.regexes.sceneNumber.exec(line);
+      if (_Tokenizer.regexes.forcedSceneHeading.test(line) || lexer.previousLineIsBlank && lexer.nextLineIsBlank && _Tokenizer.regexes.sceneHeading.test(line)) {
+        const result = _Tokenizer.regexes.sceneNumber.exec(line);
         const sceneNumber = result ? result[1] : "";
         const endIndex = sceneNumber ? line.length - sceneNumber.length - 2 : line.length;
-        const startIndex = this.regexes.forcedSceneHeading.test(line) ? 1 : 0;
+        const startIndex = line.startsWith(".") ? 1 : 0;
         const sceneNumberTokens = sceneNumber ? [
-          new Token(
-            4 /* SceneNumberFence */,
+          new RunToken(
+            2 /* SceneNumberFence */,
             "#"
           ),
-          new Token(
-            3 /* SceneNumber */,
+          new RunToken(
+            1 /* SceneNumber */,
             sceneNumber
           ),
-          new Token(
-            4 /* SceneNumberFence */,
+          new RunToken(
+            2 /* SceneNumberFence */,
             "#"
           )
         ] : [];
         if (startIndex === 1) {
           const tokens = [
-            new Token(
-              2 /* SceneHeadingForce */,
+            new RunToken(
+              0 /* SceneHeadingForce */,
               "."
             ),
             ...lexer.lexLine(line.slice(startIndex, endIndex)),
             ...sceneNumberTokens
           ];
-          return new Token(
+          return new BlockToken(
             1 /* SceneHeading */,
             tokens
           );
@@ -242,107 +213,159 @@
             ...lexer.lexLine(line.slice(startIndex, endIndex)),
             ...sceneNumberTokens
           ];
-          return new Token(
+          return new BlockToken(
             1 /* SceneHeading */,
             tokens
           );
         }
       }
-      if (lexer.previousLineIsBlank && lexer.nextLineIsBlank && this.regexes.transition.test(line)) {
-        return new Token(
-          14 /* Transition */,
+      if (lexer.previousLineIsBlank && lexer.nextLineIsBlank && _Tokenizer.regexes.transition.test(line)) {
+        return new BlockToken(
+          7 /* Transition */,
           lexer.lexLine(line)
         );
       }
-      if (lexer.previousLineIsBlank && !lexer.nextLineIsBlank && this.regexes.character.test(line)) {
+      if (lexer.previousLineIsBlank && !lexer.nextLineIsBlank && _Tokenizer.regexes.character.test(line)) {
         if (line.endsWith("^")) {
           const tokens = [
             ...lexer.lexLine(line.slice(0, -1)),
-            new Token(
-              11 /* DualDialogue */,
+            new RunToken(
+              5 /* DualDialogue */,
               "^"
             )
           ];
-          return new Token(
-            7 /* Character */,
+          return new BlockToken(
+            3 /* Character */,
             tokens
           );
         }
-        return new Token(
-          7 /* Character */,
+        return new BlockToken(
+          3 /* Character */,
           lexer.lexLine(line)
         );
       }
       if (lexer.isInDialogue) {
-        if (this.regexes.parenthetical.test(line)) {
-          return new Token(
-            10 /* Parenthetical */,
+        if (_Tokenizer.regexes.parenthetical.test(line)) {
+          return new BlockToken(
+            5 /* Parenthetical */,
             lexer.lexLine(line)
           );
         }
-        return new Token(
-          9 /* Dialogue */,
+        return new BlockToken(
+          4 /* Dialogue */,
           lexer.lexLine(line)
         );
       }
-      return new Token(
-        5 /* Action */,
+      return new BlockToken(
+        2 /* Action */,
+        lexer.lexLine(line)
+      );
+    }
+    tokenizeTitlePage(line, lexer) {
+      if (_Tokenizer.regexes.titlePageKey.test(line)) {
+        const matches = _Tokenizer.regexes.titlePageKey.exec(line);
+        const key = matches ? matches[1] : "";
+        const space = matches ? matches[2] : "";
+        const value = matches ? matches[3] : "";
+        const tokens = [
+          new RunToken(
+            17 /* TitlePageKey */,
+            key
+          ),
+          new RunToken(
+            22 /* Text */,
+            space
+          )
+        ];
+        if (value) {
+          tokens.push(new RunToken(
+            18 /* TitlePageValue */,
+            lexer.lexLine(value)
+          ));
+        }
+        return new BlockToken(
+          11 /* TitlePage */,
+          tokens
+        );
+      } else {
+        const matches = _Tokenizer.regexes.titlePageIndentedValue.exec(line);
+        if (matches) {
+          const space = matches[1];
+          const value = matches[2];
+          const tokens = [
+            new RunToken(
+              22 /* Text */,
+              space
+            ),
+            new RunToken(
+              18 /* TitlePageValue */,
+              lexer.lexLine(value)
+            )
+          ];
+          return new BlockToken(
+            11 /* TitlePage */,
+            tokens
+          );
+        }
+      }
+      return new BlockToken(
+        11 /* TitlePage */,
         lexer.lexLine(line)
       );
     }
     tokenizeChar(char, lexer) {
       if (lexer.isEscaped) {
-        return new Token(
-          34 /* Text */,
+        return new RunToken(
+          22 /* Text */,
           char
         );
       }
       if (lexer.nextChar === "*") {
         if (char === "/") {
-          return new Token(
-            22 /* BoneyardOpen */,
+          return new StyleToken(
+            13 /* BoneyardOpen */,
             "/*"
           );
         }
         if (char === "*") {
-          return new Token(
-            32 /* Bold */,
+          return new StyleToken(
+            20 /* Bold */,
             "**"
           );
         }
       }
       if (char === "*" && lexer.nextChar === "/") {
-        return new Token(
-          23 /* BoneyardClose */,
+        return new StyleToken(
+          14 /* BoneyardClose */,
           "*/"
         );
       }
       if (char === "[" && lexer.nextChar === "[") {
-        return new Token(
-          20 /* NoteOpen */,
+        return new StyleToken(
+          11 /* NoteOpen */,
           "[["
         );
       }
       if (char === "]" && lexer.nextChar === "]") {
-        return new Token(
-          21 /* NoteClose */,
+        return new StyleToken(
+          12 /* NoteClose */,
           "]]"
         );
       }
       if (char === "*") {
-        return new Token(
-          31 /* Italic */,
+        return new StyleToken(
+          19 /* Italic */,
           "*"
         );
       }
       if (char === "_") {
-        return new Token(
-          33 /* Underline */,
+        return new StyleToken(
+          21 /* Underline */,
           "_"
         );
       }
-      return new Token(
-        34 /* Text */,
+      return new RunToken(
+        22 /* Text */,
         char
       );
     }
@@ -362,23 +385,39 @@
       // Block-level flags
       this.isDocumentStart = false;
       this.isInDialogue = false;
-      this.isInTitlePage = true;
       this.nextLineIsBlank = true;
       this.previousLineIsBlank = true;
       // Inline flags
       this.isEscaped = false;
       this.nextChar = "";
+      this.openBoneyards = [];
+      this.openNotes = [];
+      this.openInlines = [];
       this.textBuffer = "";
       this.tokenizer = new Tokenizer();
     }
     lex(chunk, options) {
       this.isDocumentStart = options.isDocumentStart;
       this.isInDialogue = options.isInDialogue;
-      this.isInTitlePage = false;
       this.previousLineIsBlank = options.previousLineIsBlank;
       const lines = chunk.split("\n");
       const tokens = [];
-      for (let i = 0; i < lines.length; i++) {
+      this.openBoneyards = [];
+      this.openNotes = [];
+      this.openInlines = [];
+      if (this.isDocumentStart && Tokenizer.regexes.titlePageKey.test(lines[0])) {
+        this.isDocumentStart = false;
+        for (let i = 0; i < lines.length; i++) {
+          const token = this.tokenizer.tokenizeTitlePage(lines[i], this);
+          if (token.type === 0 /* BlankLine */ || token.type === 8 /* PageBreak */) {
+            this.previousLineIsBlank = true;
+            this.isInDialogue = false;
+            break;
+          }
+          tokens.push(token);
+        }
+      }
+      for (let i = tokens.length; i < lines.length; i++) {
         if (i < lines.length - 1) {
           const nextLine = lines[i + 1];
           this.nextLineIsBlank = !nextLine;
@@ -386,12 +425,10 @@
           this.nextLineIsBlank = options.nextLineIsBlank;
         }
         const token = this.tokenizer.tokenizeLine(lines[i], this);
-        this.isDocumentStart = false;
-        if (token.type === 0 /* BlankLine */ || token.type === 19 /* PageBreak */) {
+        if (token.type === 0 /* BlankLine */ || token.type === 8 /* PageBreak */) {
           this.previousLineIsBlank = true;
           this.isInDialogue = false;
-          this.isInTitlePage = false;
-        } else if (token.type === 7 /* Character */) {
+        } else if (token.type === 3 /* Character */) {
           this.isInDialogue = true;
           this.previousLineIsBlank = false;
         } else {
@@ -410,17 +447,13 @@
           this.nextChar = "";
         }
         const token = this.tokenizer.tokenizeChar(line[i], this);
-        if (token.type === 18 /* Escape */) {
-          this.isEscaped = true;
-        } else {
-          this.isEscaped = false;
-        }
-        if (token.type === 34 /* Text */) {
+        this.isEscaped = token.type === 10 /* Escape */;
+        if (token.type === 22 /* Text */) {
           this.textBuffer += token.content;
         } else {
           if (this.textBuffer.length > 0) {
-            tokens.push(new Token(
-              34 /* Text */,
+            tokens.push(new RunToken(
+              22 /* Text */,
               this.textBuffer
             ));
             this.textBuffer = "";
@@ -430,8 +463,8 @@
         }
       }
       if (this.textBuffer.length > 0) {
-        tokens.push(new Token(
-          34 /* Text */,
+        tokens.push(new RunToken(
+          22 /* Text */,
           this.textBuffer
         ));
         this.textBuffer = "";
@@ -442,134 +475,75 @@
 
   // ../fairfax/src/multiline.ts
   var MultilineStructure = class {
-    constructor(type, start, startToken, endLine, endToken) {
+    constructor(type, start, end) {
       this.type = type;
-      this.startLine = start;
-      this.startToken = startToken;
-      this.endLine = endLine;
-      this.endToken = endToken;
-    }
-    isWithin(multiline) {
-      if (typeof multiline.startLine === "undefined" || typeof multiline.startToken === "undefined" || typeof multiline.endLine === "undefined" || typeof multiline.endToken === "undefined") {
-        return false;
-      }
-      if (typeof this.startLine !== "undefined" && typeof this.startToken !== "undefined") {
-        if (this.startLine > multiline.startLine && this.startLine < multiline.endLine) return true;
-        if (this.startLine === multiline.startLine && this.startToken > multiline.startToken) return true;
-      }
-      if (typeof this.endLine !== "undefined" && typeof this.endToken !== "undefined") {
-        if (this.endLine > multiline.startLine && this.endLine < multiline.endLine) return true;
-        if (this.endLine === multiline.endLine && this.endToken < multiline.endToken) return true;
-      }
-      return false;
+      this.start = start;
+      this.end = end;
     }
   };
-  var MultilineManager = class {
+  var OpenMultilineStructure = class {
+    constructor(type, index, forward) {
+      this.type = type;
+      this.index = index;
+      this.forward = forward;
+    }
+    closeAt(index) {
+      const start = this.forward ? this.index : index;
+      const end = this.forward ? index : this.index;
+      return new MultilineStructure(
+        this.type,
+        start,
+        end
+      );
+    }
+  };
+  var MultilineManager = class _MultilineManager {
     constructor() {
-      this.multilineStyles = /* @__PURE__ */ new Map([
-        [0 /* Boneyard */, 4 /* Boneyard */],
-        [1 /* Note */, 5 /* Note */]
-      ]);
-      this.multilineTokens = /* @__PURE__ */ new Set([
-        22 /* BoneyardOpen */,
-        23 /* BoneyardClose */,
-        20 /* NoteOpen */,
-        21 /* NoteClose */
-      ]);
-      this.multilineTypes = /* @__PURE__ */ new Map([
-        [22 /* BoneyardOpen */, 0 /* Boneyard */],
-        [23 /* BoneyardClose */, 0 /* Boneyard */],
-        [20 /* NoteOpen */, 1 /* Note */],
-        [21 /* NoteClose */, 1 /* Note */]
-      ]);
       this.openMultilines = [];
       this.activeMultilines = /* @__PURE__ */ new Set();
       this.hasOpenTitlePage = false;
+    }
+    static {
+      this.multilineTypes = /* @__PURE__ */ new Map([
+        [13 /* BoneyardOpen */, 0 /* Boneyard */],
+        [14 /* BoneyardClose */, 0 /* Boneyard */],
+        [11 /* NoteOpen */, 1 /* Note */],
+        [12 /* NoteClose */, 1 /* Note */]
+      ]);
     }
     reset() {
       this.openMultilines = [];
       this.activeMultilines = /* @__PURE__ */ new Set();
     }
-    manage(token, blocks, runs, lineIndex, tokenIndex) {
-      const type = this.multilineTypes.get(token.type);
-      if (typeof type === "undefined") return;
-      if (this.isCloser(token)) {
-        for (let i = this.openMultilines.length - 1; i >= 0; i--) {
-          const multiline = this.openMultilines[i];
-          if (type === multiline.type) {
-            this.closeMultiline(multiline, i, blocks, runs, lineIndex, tokenIndex);
-            return;
-          }
+    manage(token, index) {
+      const type = _MultilineManager.multilineTypes.get(token.type);
+      if (type === void 0) return;
+      if (token.active) {
+        if (token.isOpener()) {
+          this.openMultilines.push(new OpenMultilineStructure(
+            type,
+            index,
+            true
+          ));
         }
-        this.openMultiline(type, void 0, void 0, lineIndex, tokenIndex);
-      }
-      if (this.isOpener(token)) {
-        this.openMultiline(type, lineIndex, tokenIndex);
-      }
-    }
-    isCloser(token) {
-      return token.type === 23 /* BoneyardClose */ || token.type === 21 /* NoteClose */;
-    }
-    isOpener(token) {
-      return token.type === 22 /* BoneyardOpen */ || token.type === 20 /* NoteOpen */;
-    }
-    openMultiline(type, startLine, startToken, endLine, endToken) {
-      if (typeof startLine !== "undefined" && typeof startToken !== "undefined") {
-        this.openMultilines.push(new MultilineStructure(
-          type,
-          startLine,
-          startToken + 1
-        ));
-      }
-      if (typeof endLine !== "undefined" && typeof endToken !== "undefined") {
-        this.openMultilines.push(new MultilineStructure(
-          type,
-          void 0,
-          void 0,
-          endLine,
-          endToken - 1
-        ));
-      }
-    }
-    closeMultiline(multiline, multilineIndex, blocks, runs, lineIndex, tokenIndex) {
-      const style = this.multilineStyles.get(multiline.type);
-      const startLineIndex = typeof multiline.startLine === "undefined" ? lineIndex : multiline.startLine;
-      const tokenStartIndex = typeof multiline.startToken === "undefined" ? tokenIndex : multiline.startToken;
-      const endLineIndex = typeof multiline.endLine === "undefined" ? lineIndex : multiline.endLine;
-      const tokenEndIndex = typeof multiline.endToken === "undefined" ? tokenIndex : multiline.endToken;
-      if (typeof style === "undefined") return;
-      if (multiline.type === 0 /* Boneyard */) {
-        for (let i = this.openMultilines.length - 1; i >= 0; i--) {
-          const openMultiline = this.openMultilines[i];
-          if (openMultiline.type === 1 /* Note */) {
-            if (openMultiline.isWithin(multiline)) {
+        if (token.isCloser()) {
+          for (let i = this.openMultilines.length - 1; i >= 0; i--) {
+            const openMultiline = this.openMultilines[i];
+            if (type === openMultiline.type) {
+              const closedStructure = openMultiline.closeAt(index);
               this.openMultilines.splice(i, 1);
+              this.activeMultilines.add(closedStructure);
+              break;
             }
           }
         }
+      } else {
+        this.openMultilines.push(new OpenMultilineStructure(
+          type,
+          index,
+          token.isOpener()
+        ));
       }
-      for (let i = startLineIndex + 1; i < endLineIndex; i++) {
-        for (let run of blocks[i].runs) {
-          run.styles.delete(5 /* Note */);
-          run.styles.add(style);
-        }
-      }
-      if (startLineIndex < endLineIndex) {
-        const startLine = blocks[startLineIndex];
-        startLine.runs[tokenStartIndex - 1].styles.add(6 /* Special */);
-        for (let i = tokenStartIndex; i < startLine.runs.length; i++) {
-          startLine.runs[i].styles.delete(5 /* Note */);
-          startLine.runs[i].styles.add(style);
-        }
-      }
-      for (let i = 0; i < tokenEndIndex; i++) {
-        runs[i].styles.delete(5 /* Note */);
-        runs[i].styles.add(style);
-      }
-      runs[tokenEndIndex].styles.add(6 /* Special */);
-      multiline.endLine = endLineIndex;
-      this.openMultilines.splice(multilineIndex, 1);
-      this.activeMultilines.add(multiline);
     }
     openTitlePage() {
       this.hasOpenTitlePage = true;
@@ -579,89 +553,56 @@
       this.activeMultilines.add(new MultilineStructure(
         2 /* TitlePage */,
         0,
-        void 0,
         index
       ));
     }
   };
 
   // ../fairfax/src/stylizer.ts
-  var Stylizer = class {
+  var Stylizer = class _Stylizer {
     constructor() {
+      this.activeStyles = /* @__PURE__ */ new Set();
+    }
+    static {
       this.styleMap = /* @__PURE__ */ new Map([
-        [16 /* CenterLeft */, 0 /* Centered */],
-        [17 /* CenterRight */, 0 /* Centered */],
-        [32 /* Bold */, 1 /* Bold */],
-        [31 /* Italic */, 2 /* Italic */],
-        [33 /* Underline */, 3 /* Underline */],
-        [22 /* BoneyardOpen */, 4 /* Boneyard */],
-        [23 /* BoneyardClose */, 4 /* Boneyard */],
-        [20 /* NoteOpen */, 5 /* Note */],
-        [21 /* NoteClose */, 5 /* Note */]
+        [20 /* Bold */, 0 /* Bold */],
+        [19 /* Italic */, 1 /* Italic */],
+        [21 /* Underline */, 2 /* Underline */],
+        [13 /* BoneyardOpen */, 3 /* Boneyard */],
+        [14 /* BoneyardClose */, 3 /* Boneyard */],
+        [11 /* NoteOpen */, 4 /* Note */],
+        [12 /* NoteClose */, 4 /* Note */]
       ]);
-      this.closerTokens = /* @__PURE__ */ new Set([
-        17 /* CenterRight */,
-        32 /* Bold */,
-        31 /* Italic */,
-        33 /* Underline */,
-        23 /* BoneyardClose */,
-        21 /* NoteClose */
-      ]);
-      this.openerTokens = /* @__PURE__ */ new Set([
-        16 /* CenterLeft */,
-        32 /* Bold */,
-        31 /* Italic */,
-        33 /* Underline */,
-        22 /* BoneyardOpen */,
-        20 /* NoteOpen */
-      ]);
-      this.openStyles = /* @__PURE__ */ new Set();
-      this.openStyleStarts = /* @__PURE__ */ new Map();
     }
-    stylize(token, runs, tokenIndex) {
-      if (token.type === 2 /* SceneHeadingForce */ || token.type === 4 /* SceneNumberFence */ || token.type === 6 /* ActionForce */ || token.type === 8 /* CharacterForce */ || token.type === 11 /* DualDialogue */ || token.type === 13 /* LyricLeader */ || token.type === 15 /* TransitionForce */ || token.type === 25 /* SectionHeadingLeader */ || token.type === 27 /* SynopsisLeader */) {
-        return /* @__PURE__ */ new Set([6 /* Special */]);
+    stylize(token) {
+      if (token instanceof StyleToken) {
+        const styles = new Set(this.activeStyles).add(5 /* Special */);
+        this.process(token);
+        if (token.active) {
+          return styles;
+        }
       }
-      if (token.type === 29 /* TitlePageKey */) {
-        return /* @__PURE__ */ new Set([7 /* TitlePageKey */]);
+      if (token.type === 0 /* SceneHeadingForce */ || token.type === 2 /* SceneNumberFence */ || token.type === 3 /* ActionForce */ || token.type === 4 /* CharacterForce */ || token.type === 5 /* DualDialogue */ || token.type === 6 /* LyricLeader */ || token.type === 7 /* TransitionForce */ || token.type === 15 /* SectionHeadingLeader */ || token.type === 16 /* SynopsisLeader */) {
+        return /* @__PURE__ */ new Set([5 /* Special */]);
       }
-      if (token.type === 30 /* TitlePageValue */) {
-        return /* @__PURE__ */ new Set([8 /* TitlePageValue */]);
+      if (token.type === 17 /* TitlePageKey */) {
+        return /* @__PURE__ */ new Set([6 /* TitlePageKey */]);
       }
-      if (token.type === 34 /* Text */) {
-        return /* @__PURE__ */ new Set();
-      }
-      return this.handleStyle(token, runs, tokenIndex);
+      return this.activeStyles;
     }
-    reset() {
-      this.openStyles = /* @__PURE__ */ new Set();
-      this.openStyleStarts = /* @__PURE__ */ new Map();
-    }
-    handleStyle(token, runs, tokenIndex) {
-      const style = this.styleMap.get(token.type);
-      if (typeof style === "undefined") return /* @__PURE__ */ new Set();
-      if (this.closerTokens.has(token.type) && this.openStyles.has(style)) {
-        this.closeStyle(style, runs, tokenIndex);
-        return /* @__PURE__ */ new Set([6 /* Special */]);
-      }
-      if (this.openerTokens.has(token.type)) {
-        this.openStyle(style, tokenIndex);
-      }
-      return /* @__PURE__ */ new Set();
-    }
-    openStyle(style, tokenIndex) {
-      this.openStyles.add(style);
-      if (!this.openStyleStarts.has(style)) {
-        this.openStyleStarts.set(style, tokenIndex + 1);
+    process(token) {
+      if (token.active) {
+        const style = _Stylizer.styleMap.get(token.type);
+        if (style === void 0) return;
+        if (this.activeStyles.has(style)) {
+          this.activeStyles.delete(style);
+        } else {
+          this.activeStyles.add(style);
+        }
       }
     }
-    closeStyle(style, runs, tokenIndex) {
-      const startIndex = this.openStyleStarts.get(style);
-      runs[startIndex - 1].styles.add(6 /* Special */);
-      for (let i = startIndex; i < tokenIndex; i++) {
-        runs[i].styles.add(style);
-      }
-      this.openStyles.delete(style);
+    isMultiline(token) {
+      return token.type === 13 /* BoneyardOpen */ || token.type === 14 /* BoneyardClose */ || token.type === 11 /* NoteOpen */ || token.type === 12 /* NoteClose */;
     }
   };
 
@@ -675,28 +616,33 @@
       this.previousLineIsBlank = previousLineIsBlank ?? true;
     }
   };
-  var Parser = class {
+  var Parser = class _Parser {
     constructor() {
       this.lexer = new Lexer();
       this.mlManager = new MultilineManager();
       this.stylizer = new Stylizer();
+      this.activeStyles = /* @__PURE__ */ new Set();
+      this.isInBoneyard = false;
+      this.isInDualDialogue = false;
+      this.isInNote = false;
+      this.openTitlePageKey = "";
+      this.openTitlePageValue = [];
+    }
+    static {
       this.typeMap = /* @__PURE__ */ new Map([
         [0 /* BlankLine */, 0 /* BlankLine */],
         [1 /* SceneHeading */, 1 /* SceneHeading */],
-        [5 /* Action */, 2 /* Action */],
-        [7 /* Character */, 3 /* Character */],
-        [9 /* Dialogue */, 4 /* Dialogue */],
-        [10 /* Parenthetical */, 5 /* Parenthetical */],
-        [12 /* Lyric */, 6 /* Lyric */],
-        [14 /* Transition */, 7 /* Transition */],
-        [19 /* PageBreak */, 8 /* PageBreak */],
-        [24 /* SectionHeading */, 9 /* SectionHeading */],
-        [26 /* Synopsis */, 10 /* Synopsis */],
-        [28 /* TitlePage */, 11 /* TitlePage */]
+        [2 /* Action */, 2 /* Action */],
+        [3 /* Character */, 3 /* Character */],
+        [4 /* Dialogue */, 4 /* Dialogue */],
+        [5 /* Parenthetical */, 5 /* Parenthetical */],
+        [6 /* Lyric */, 6 /* Lyric */],
+        [7 /* Transition */, 7 /* Transition */],
+        [8 /* PageBreak */, 8 /* PageBreak */],
+        [9 /* SectionHeading */, 9 /* SectionHeading */],
+        [10 /* Synopsis */, 10 /* Synopsis */],
+        [11 /* TitlePage */, 11 /* TitlePage */]
       ]);
-      this.isInDualDialogue = false;
-      this.openKey = "";
-      this.openValue = [];
     }
     parse(chunk, options) {
       const lexerOptions = new LexerOptions(
@@ -706,42 +652,44 @@
         options.previousLineIsBlank
       );
       const tokens = this.lexer.lex(chunk, lexerOptions);
+      const titlePage = /* @__PURE__ */ new Map();
       const blocks = [];
       this.mlManager.reset();
       this.isInDualDialogue = options.isInDualDialogue;
-      const titlePage = /* @__PURE__ */ new Map();
-      for (let [i, token] of tokens.entries()) {
-        const blockType = this.typeMap.get(token.type) ?? 2 /* Action */;
-        if (typeof token.content === "string") {
-          blocks.push(
-            new Block(
-              blockType,
-              [new Run(token.content, /* @__PURE__ */ new Set())]
-            )
-          );
-        } else {
-          if (blockType === 11 /* TitlePage */) {
-            this.parseTitlePageTokens(token.content, titlePage);
+      if (options.isDocumentStart) {
+        for (let [i, token] of tokens.entries()) {
+          if (token.type === 11 /* TitlePage */) {
+            this.parseTitlePageBlock(token.content, titlePage);
             this.mlManager.openTitlePage();
-          } else if (blockType === 0 /* BlankLine */) {
-            if (this.mlManager.hasOpenTitlePage) this.mlManager.closeTitlePage(i);
-            this.isInDualDialogue = false;
-          }
-          const runs = this.parseInnerTokens(token.content, blocks, i);
-          if (this.isInDualDialogue) {
-            blocks.push(new Block(blockType, runs, true));
           } else {
-            blocks.push(new Block(blockType, runs));
+            if (this.mlManager.hasOpenTitlePage) {
+              this.mlManager.closeTitlePage(i);
+            }
+            break;
           }
         }
+        if (this.openTitlePageKey) {
+          titlePage.set(this.openTitlePageKey, this.openTitlePageValue.join("\n"));
+          this.openTitlePageKey = "";
+          this.openTitlePageValue = [];
+        }
+        if (this.mlManager.hasOpenTitlePage) {
+          this.mlManager.closeTitlePage(tokens.length - 1);
+        }
       }
-      if (this.openKey) {
-        titlePage.set(this.openKey, this.openValue.join("\n"));
-        this.openKey = "";
-        this.openValue = [];
-      }
-      if (this.mlManager.hasOpenTitlePage) {
-        this.mlManager.closeTitlePage(blocks.length - 1);
+      this.parseBoneyards(tokens);
+      this.parseNotes(tokens);
+      for (let [i, token] of tokens.entries()) {
+        this.parseInlines(token.content);
+        const blockType = this.isInNote ? 2 /* Action */ : _Parser.typeMap.get(token.type) ?? 2 /* Action */;
+        if (blockType === 0 /* BlankLine */) this.isInDualDialogue = false;
+        const runs = this.parseBlock(token.content, i);
+        blocks.push(new Block(
+          blockType,
+          runs,
+          token.centered,
+          this.isInDualDialogue
+        ));
       }
       return new Document(
         titlePage,
@@ -750,34 +698,101 @@
         this.mlManager.openMultilines
       );
     }
-    parseInnerTokens(tokens, blocks, lineIndex) {
+    parseBlock(tokens, lineIndex) {
       const runs = [];
-      for (let [i, token] of tokens.entries()) {
-        if (token.type === 11 /* DualDialogue */) {
+      for (let token of tokens) {
+        if (token.type === 5 /* DualDialogue */) {
           this.isInDualDialogue = true;
         }
-        const text = typeof token.content === "string" ? token.content : "";
-        const styles = this.stylizer.stylize(token, runs, i);
-        runs.push(new Run(text, styles));
-        if (this.mlManager.multilineTokens.has(token.type)) {
-          this.mlManager.manage(token, blocks, runs, lineIndex, i);
+        if (token.type === 18 /* TitlePageValue */ && Array.isArray(token.content)) {
+          return [...runs, ...this.parseBlock(token.content, lineIndex)];
         }
+        if (token.isMultilineStyle()) this.mlManager.manage(token, lineIndex);
+        const text = typeof token.content === "string" ? token.content : "";
+        const styles = this.stylizer.stylize(token);
+        runs.push(new Run(text, new Set(styles)));
       }
-      this.stylizer.reset();
       return runs;
     }
-    parseTitlePageTokens(tokens, titlePage) {
+    parseTitlePageBlock(tokens, titlePage) {
       for (let token of tokens) {
         const text = typeof token.content === "string" ? token.content : "";
-        if (token.type === 29 /* TitlePageKey */) {
-          if (this.openKey && this.openValue) {
-            titlePage.set(this.openKey, this.openValue.join("\n"));
+        if (token.type === 17 /* TitlePageKey */) {
+          if (this.openTitlePageKey && this.openTitlePageValue) {
+            titlePage.set(this.openTitlePageKey, this.openTitlePageValue.join("\n"));
           }
-          this.openKey = text;
-          this.openValue = [];
-        } else if (token.type === 30 /* TitlePageValue */) {
+          this.openTitlePageKey = text;
+          this.openTitlePageValue = [];
+        } else if (token.type === 18 /* TitlePageValue */) {
           const value = text;
-          this.openValue.push(value);
+          this.openTitlePageValue.push(value);
+        }
+      }
+    }
+    parseBoneyards(tokens) {
+      let openBoneyard;
+      for (let blockToken of tokens) {
+        for (let runToken of blockToken.content) {
+          if (Array.isArray(runToken)) continue;
+          if (!(runToken instanceof StyleToken)) continue;
+          if (runToken.type === 13 /* BoneyardOpen */) {
+            openBoneyard = runToken;
+          } else if (runToken.type === 14 /* BoneyardClose */) {
+            if (openBoneyard) {
+              openBoneyard.active = true;
+              runToken.active = true;
+              openBoneyard = void 0;
+            }
+          }
+        }
+      }
+    }
+    parseNotes(tokens) {
+      let openNote;
+      let isInBoneyard = false;
+      for (let blockToken of tokens) {
+        for (let runToken of blockToken.content) {
+          if (Array.isArray(runToken)) continue;
+          if (!(runToken instanceof StyleToken)) continue;
+          if (runToken.active) {
+            if (runToken.type === 13 /* BoneyardOpen */) isInBoneyard = true;
+            if (runToken.type === 14 /* BoneyardClose */) isInBoneyard = false;
+          }
+          if (isInBoneyard) continue;
+          if (runToken.type === 11 /* NoteOpen */) {
+            openNote = runToken;
+          } else if (runToken.type === 12 /* NoteClose */) {
+            if (openNote) {
+              openNote.active = true;
+              runToken.active = true;
+              openNote = void 0;
+            }
+          }
+        }
+      }
+    }
+    parseInlines(tokens) {
+      const openInlines = [];
+      for (let token of tokens) {
+        if (!(token instanceof StyleToken)) continue;
+        if (token.active) {
+          if (token.type === 13 /* BoneyardOpen */) this.isInBoneyard = true;
+          if (token.type === 14 /* BoneyardClose */) this.isInBoneyard = false;
+          if (token.type === 11 /* NoteOpen */) this.isInNote = true;
+          if (token.type === 12 /* NoteClose */) this.isInNote = false;
+        }
+        if (this.isInBoneyard || this.isInNote) continue;
+        if (token.type === 20 /* Bold */ || token.type === 19 /* Italic */ || token.type === 21 /* Underline */) {
+          for (let i = openInlines.length - 1; i >= 0; i--) {
+            const openInline = openInlines[i];
+            if (token.type === openInline.type) {
+              openInline.active = true;
+              token.active = true;
+              openInlines.splice(i, 1);
+              break;
+            }
+          }
+          if (!token.active) openInlines.push(token);
         }
       }
     }
@@ -824,7 +839,7 @@
     overlaps(range) {
       return this.start <= range.end && range.start <= this.end;
     }
-    includes(range) {
+    includesRange(range) {
       return this.start <= range.start && this.end >= range.end;
     }
     includesIndex(index) {
@@ -845,103 +860,87 @@
     }
   };
   var MultilineEnd = class {
-    constructor(type, start, end) {
+    constructor(type, index, forward) {
       this.type = type;
-      this.start = start;
-      this.end = end;
+      this.index = index;
+      this.forward = forward;
     }
     isInRange(range) {
-      if (typeof this.start === "number" && range.includesIndex(this.start)) {
-        return true;
-      }
-      if (typeof this.end === "number" && range.includesIndex(this.end)) {
-        return true;
-      }
-      return false;
+      return range.includesIndex(this.index);
     }
   };
   var MultilineManager2 = class {
     constructor(view) {
-      this.activeRanges = /* @__PURE__ */ new Set();
-      this.openEnds = [];
+      this.activeMultilines = /* @__PURE__ */ new Set();
+      this.openMultilines = [];
       this.view = view;
     }
     manage(fairfaxDocument, range) {
-      for (let activeRange of this.activeRanges) {
-        if (range.includes(activeRange.range)) {
-          this.activeRanges.delete(activeRange);
+      for (let multiline of this.activeMultilines) {
+        if (range.includesRange(multiline.range)) {
+          this.activeMultilines.delete(multiline);
         }
       }
-      for (let i = this.openEnds.length - 1; i >= 0; i--) {
-        const openEnd = this.openEnds[i];
+      for (let i = this.openMultilines.length - 1; i >= 0; i--) {
+        const openEnd = this.openMultilines[i];
         if (openEnd.isInRange(range)) {
-          this.openEnds.splice(i, 1);
+          this.openMultilines.splice(i, 1);
         }
       }
-      for (let activeMultiline of fairfaxDocument.activeMultilines) {
-        if (typeof activeMultiline.startLine === "undefined" || typeof activeMultiline.endLine === "undefined") continue;
-        this.activeRanges.add(new MultilineRange(
-          activeMultiline.type,
-          new LineRange(activeMultiline.startLine + range.start, activeMultiline.endLine + range.start)
+      for (let structure of fairfaxDocument.activeMultilines) {
+        const start = structure.start + range.start;
+        const end = structure.end + range.start;
+        this.activeMultilines.add(new MultilineRange(
+          structure.type,
+          new LineRange(start, end)
         ));
       }
-      for (let openMultiline of fairfaxDocument.openMultilines) {
-        if (typeof openMultiline.startLine === "undefined") {
-          if (typeof openMultiline.endLine === "undefined") continue;
-          const end = new MultilineEnd(
-            openMultiline.type,
-            void 0,
-            openMultiline.endLine + range.start
-          );
-          this.tryClosing(end);
-        }
-        if (typeof openMultiline.endLine === "undefined") {
-          if (typeof openMultiline.startLine === "undefined") continue;
-          const end = new MultilineEnd(
-            openMultiline.type,
-            openMultiline.startLine + range.start
-          );
-          this.tryClosing(end);
-        }
+      for (let structure of fairfaxDocument.openMultilines) {
+        const end = new MultilineEnd(
+          structure.type,
+          structure.index,
+          structure.forward
+        );
+        this.tryClosing(end);
       }
     }
     tryClosing(end) {
-      if (typeof end.start === "undefined") {
-        if (typeof end.end === "undefined") return;
-        for (let i = this.openEnds.length - 1; i >= 0; i--) {
-          const otherEnd = this.openEnds[i];
-          if (end.type === otherEnd.type && typeof otherEnd.start !== "undefined" && otherEnd.start < end.end) {
+      if (end.forward) {
+        for (let i = 0; i < this.openMultilines.length; i++) {
+          const otherEnd = this.openMultilines[i];
+          if (end.type === otherEnd.type && otherEnd.index > end.index && !otherEnd.forward) {
+            this.close(end, otherEnd, i);
+            return;
+          }
+        }
+      } else {
+        for (let i = this.openMultilines.length - 1; i >= 0; i--) {
+          const otherEnd = this.openMultilines[i];
+          if (end.type === otherEnd.type && otherEnd.index < end.index && otherEnd.forward) {
             this.close(otherEnd, end, i);
             return;
           }
         }
       }
-      if (typeof end.end === "undefined") {
-        if (typeof end.start === "undefined") return;
-        for (let i = 0; i < this.openEnds.length; i++) {
-          const otherEnd = this.openEnds[i];
-          if (end.type === otherEnd.type && typeof otherEnd.end !== "undefined" && otherEnd.end >= end.start) {
-            this.close(end, otherEnd, i);
-            return;
-          }
-        }
-      }
-      this.openEnds.push(end);
+      this.openMultilines.push(end);
     }
     close(start, end, index) {
-      if (typeof start.start === "undefined" || typeof end.end === "undefined") return;
-      this.openEnds.splice(index, 1);
-      this.activeRanges.add(new MultilineRange(
+      this.openMultilines.splice(index, 1);
+      this.activeMultilines.add(new MultilineRange(
         start.type,
-        new LineRange(start.start, end.end)
+        new LineRange(start.index, end.index)
       ));
     }
-    insertLine(index) {
-      for (let range of this.activeRanges) {
-        if (range.range.includesIndex(index)) {
-          range.range.end += 1;
-        }
+    /* 
+     * Check if the given range overlaps with any active multiline ranges. Note
+     * that we exclude the case where the given range is larger than or equal to
+     * an active range, as we're already processing the active range if so.
+     */
+    multilinesOverlap(range) {
+      for (let multiline of this.activeMultilines) {
+        if (multiline.range.overlaps(range) && !range.includesRange(multiline.range)) return multiline.range;
       }
+      return;
     }
   };
 
@@ -958,31 +957,32 @@
       if (!anchor) return;
       const activeLine = this.view.getLineElementFrom(anchor);
       if (!activeLine) return;
-      if (anchor.parentElement && anchor.parentElement.tagName === "SPAN") {
+      if (anchor.parentElement?.tagName === "SPAN") {
         anchor = anchor.parentElement;
       }
+      const childNodes = Array.from(activeLine.childNodes);
       if (anchor.nodeName === "DIV") {
-        let offset2 = 0;
-        for (let i = 0; i < selection.anchorOffset; i++) {
-          const childText = anchor.childNodes[i].textContent;
-          if (childText) offset2 += childText.length;
-        }
-        this.offset = offset2;
+        this.offset = this.sumNodeLengths(
+          childNodes,
+          0,
+          selection.anchorOffset
+        );
         return;
       }
-      let offset = 0;
-      for (let childNode of activeLine.childNodes) {
-        if (childNode === anchor) {
-          this.offset = offset + selection.anchorOffset;
-          return;
-        } else {
-          const nodeText = childNode.textContent;
-          if (nodeText) offset += nodeText.length;
-        }
-      }
+      this.offset = this.sumNodeLengths(
+        childNodes,
+        0,
+        childNodes.indexOf(anchor)
+      ) + selection.anchorOffset;
+    }
+    sumNodeLengths(nodes, start, end) {
+      return nodes.slice(start, end).reduce(
+        (sum, node) => node.textContent ? sum + node.textContent.length : sum,
+        0
+      );
     }
     render() {
-      const activeLine = this.view.getActiveLine() || this.view.container;
+      const activeLine = this.view.getActiveLine() ?? this.view.container;
       const selection = document.getSelection();
       if (!selection) return;
       if (this.offset === 0) {
@@ -993,7 +993,7 @@
         const nodeText = childNode.textContent;
         if (!nodeText) continue;
         if (this.offset <= nodeText.length) {
-          if (childNode.nodeType != Node.TEXT_NODE) {
+          if (childNode.nodeType !== Node.TEXT_NODE) {
             childNode = childNode.childNodes[0];
           }
           selection.setPosition(childNode, this.offset);
@@ -1024,15 +1024,14 @@
         [11 /* TitlePage */, "TitlePage"]
       ]);
       this.styleMap = /* @__PURE__ */ new Map([
-        [0 /* Centered */, "Centered"],
-        [1 /* Bold */, "Bold"],
-        [2 /* Italic */, "Italic"],
-        [3 /* Underline */, "Underline"],
-        [4 /* Boneyard */, "Boneyard"],
-        [5 /* Note */, "Note"],
-        [6 /* Special */, "Special"],
-        [7 /* TitlePageKey */, "TitlePageKey"],
-        [8 /* TitlePageValue */, "TitlePageValue"]
+        [0 /* Bold */, "Bold"],
+        [1 /* Italic */, "Italic"],
+        [2 /* Underline */, "Underline"],
+        [3 /* Boneyard */, "Boneyard"],
+        [4 /* Note */, "Note"],
+        [5 /* Special */, "Special"],
+        [6 /* TitlePageKey */, "TitlePageKey"],
+        [7 /* TitlePageValue */, "TitlePageValue"]
       ]);
       this.container = container2;
       this.selection = new ViewSelection(this);
@@ -1143,6 +1142,9 @@
     classLine(line, block) {
       const lineClass = this.blockMap.get(block.type) ?? "Action";
       line.className = lineClass;
+      if (block.centered) {
+        line.classList.add("Centered");
+      }
       if (block.isDual) {
         line.classList.add("Dual");
       }
@@ -1152,46 +1154,49 @@
   // src/editor.ts
   var Editor = class {
     constructor(container2) {
-      this.updateCount = 0;
       this.parser = new Parser();
       this.container = container2;
       this.container.setAttribute("contenteditable", "true");
-      this.container.addEventListener("input", (e) => this.handleInput(e));
+      this.container.addEventListener("input", (e) => {
+        this.handleInput(e);
+      });
       this.view = new View(container2);
       this.mlManager = new MultilineManager2(this.view);
     }
     handleInput(e) {
-      this.updateCount = 0;
-      let activeLine = this.view.getActiveLine();
+      const activeLine = this.view.getActiveLine();
       if (!activeLine && this.container.querySelectorAll("div").length === 0) {
         this.view.resetContainer();
       }
       if (!activeLine) return;
-      this.updateLine(activeLine, true);
       if (e.inputType === "insertParagraph") {
         const lineIndex = this.view.getLineIndex(activeLine);
-        if (typeof lineIndex !== "undefined") {
-          this.mlManager.insertLine(lineIndex);
+        if (lineIndex === void 0) return;
+        const lineRange = new LineRange(lineIndex, lineIndex);
+        const overlap = this.mlManager.multilinesOverlap(lineRange);
+        if (overlap) {
+          const extendedRange = new LineRange(overlap.start, overlap.end + 1);
+          this.updateRange(lineRange.extend(extendedRange), true);
+          return;
         }
       }
+      this.updateLine(activeLine, true);
     }
-    updateLine(line, isOrigin) {
+    updateLine(line, shouldRewrite) {
       if (line.classList.contains("Dual") && line.classList.contains("Character")) {
-        isOrigin = true;
+        shouldRewrite = true;
       }
       const lineIndex = this.view.getLineIndex(line);
-      if (typeof lineIndex !== "undefined") {
-        this.updateRange(new LineRange(lineIndex, lineIndex), isOrigin);
+      if (lineIndex !== void 0) {
+        this.updateRange(new LineRange(lineIndex, lineIndex), shouldRewrite);
       }
     }
-    updateRange(range, isOrigin) {
-      this.updateCount += 1;
-      if (this.updateCount > 99) return;
+    updateRange(range, shouldRewrite) {
       const text = this.view.getTextInRange(range);
       const context = new RangeContext(range, this.view);
       if (context.nextLine && context.nextLine.tagName === "BR") {
         context.nextLine.remove();
-        this.updateRange(range, isOrigin);
+        this.updateRange(range, shouldRewrite);
         return;
       }
       const parserOptions = new ParserOptions(
@@ -1201,25 +1206,14 @@
         context.nextLineIsBlank,
         context.previousLineIsBlank
       );
-      const [firstLineStartingClass, lastLineStartingClass] = this.getBorderClasses(range);
+      const [firstLineStartClass, lastLineStartClass] = this.getBorderClasses(range);
       const fairfaxDocument = this.parser.parse(text, parserOptions);
       this.mlManager.manage(fairfaxDocument, range);
-      console.log(this.mlManager.activeRanges);
-      for (let multiline of this.mlManager.activeRanges) {
-        if (range.overlaps(multiline.range) && !range.includes(multiline.range)) {
-          console.log("Multiline range detected");
-          for (let activeRange of this.mlManager.activeRanges) {
-            console.log(activeRange.range);
-          }
-          console.log(range);
-          this.updateRange(range.extend(multiline.range), true);
-          return;
-        }
-      }
-      const shouldRewrite = isOrigin || false;
-      this.view.updateRange(range, fairfaxDocument.blocks, shouldRewrite);
-      const [firstLineEndingClass, lastLineEndingClass] = this.getBorderClasses(range);
-      if (firstLineStartingClass != firstLineEndingClass || lastLineStartingClass != lastLineEndingClass) {
+      const overlap = this.mlManager.multilinesOverlap(range);
+      if (overlap) this.updateRange(range.extend(overlap), true);
+      this.view.updateRange(range, fairfaxDocument.blocks, shouldRewrite ?? false);
+      const [firstLineEndClass, lastLineEndClass] = this.getBorderClasses(range);
+      if (firstLineStartClass != firstLineEndClass || lastLineStartClass != lastLineEndClass) {
         this.updateNeighbors(context);
       }
     }
@@ -1230,9 +1224,7 @@
     getBorderClasses(range) {
       const firstLine = this.view.getLineAt(range.start);
       const lastLine = this.view.getLineAt(range.end);
-      const firstLineClass = firstLine ? firstLine.className : void 0;
-      const lastLineClass = lastLine ? lastLine.className : void 0;
-      return [firstLineClass, lastLineClass];
+      return [firstLine?.className, lastLine?.className];
     }
   };
 

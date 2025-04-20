@@ -21,7 +21,6 @@ export class View {
         [BlockType.TitlePage, "TitlePage"]
     ]);
     styleMap = new Map([
-        [RunStyle.Centered, "Centered"],
         [RunStyle.Bold, "Bold"],
         [RunStyle.Italic, "Italic"],
         [RunStyle.Underline, "Underline"],
@@ -198,6 +197,9 @@ export class View {
     classLine(line: HTMLElement, block: Block) {
         const lineClass = this.blockMap.get(block.type) ?? "Action";
         line.className = lineClass;
+        if (block.centered) {
+            line.classList.add("Centered");
+        }
         if (block.isDual) {
             line.classList.add("Dual");
         }

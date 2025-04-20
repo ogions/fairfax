@@ -6,24 +6,25 @@ import { View } from "./view";
 export class Editor {
     container: HTMLElement;
     mlManager: MultilineManager;
-    updateCount = 0;
     parser = new Parser();
     view: View;
 
     constructor(container: HTMLElement) {
         this.container = container;
         this.container.setAttribute("contenteditable", "true");
-        this.container.addEventListener("input", (e) => this.handleInput(e as InputEvent));
+        this.container.addEventListener("input", (e) => {
+            this.handleInput(e as InputEvent)
+        });
 
         this.view = new View(container);
         this.mlManager = new MultilineManager(this.view);
     }
 
     handleInput(e: InputEvent) {
-        this.updateCount = 0;
-        let activeLine = this.view.getActiveLine();
+        const activeLine = this.view.getActiveLine();
 
-        /* If there are no more child lines in the main container, then we
+        /* 
+         * If there are no more child lines in the main container, then we
          * need to reset the container to have one empty line element.
          * This prevents the document from becoming malformed.
          *
@@ -35,51 +36,65 @@ export class Editor {
             this.view.resetContainer();
         }
         if (!activeLine) return;
+        
+        /* 
+         * If we added a line inside of an active multiline, then we should
+         * reparse the entire multiline range (with an adjusted end index to
+         * account for the new line).
+         */
+        if (e.inputType === "insertParagraph") {
+            const lineIndex = this.view.getLineIndex(activeLine);
+            if (lineIndex === undefined) return;
+            const lineRange = new LineRange(lineIndex, lineIndex);
+            const overlap = this.mlManager.multilinesOverlap(lineRange);
+            if (overlap) {
+                const extendedRange = new LineRange(overlap.start, overlap.end + 1);
+                this.updateRange(lineRange.extend(extendedRange), true);
+                return;
+            }
+        }
 
         this.updateLine(activeLine, true);
 
-        if (e.inputType === "insertParagraph") {
-            const lineIndex = this.view.getLineIndex(activeLine);
-            if (typeof lineIndex !== "undefined") {
-                this.mlManager.insertLine(lineIndex);
-            }
-        }
     }
 
-    updateLine(line: HTMLElement, isOrigin?: boolean) {
-        /* If this is a dual dialogue character, we need to rewrite it to add
-         * the special dual dialogue flag.
+    updateLine(line: HTMLElement, shouldRewrite?: boolean) {
+
+        /* 
+         * If this is a character element with the dual dialogue flag, we need
+         * to rewrite it to reformat the flag.
          */
-        if (line.classList.contains("Dual") && line.classList.contains("Character")) {
-            isOrigin = true;
+        if (
+            line.classList.contains("Dual") &&
+            line.classList.contains("Character")
+        ) {
+            shouldRewrite = true;
         }
 
         const lineIndex = this.view.getLineIndex(line);
-        if (typeof lineIndex !== "undefined") {
-            this.updateRange(new LineRange(lineIndex, lineIndex), isOrigin)
+        if (lineIndex !== undefined) {
+            this.updateRange(new LineRange(lineIndex, lineIndex), shouldRewrite)
         }
     }
 
-    updateRange(range: LineRange, isOrigin?: boolean) {
-        this.updateCount += 1;
-        if (this.updateCount > 99) return;
+    updateRange(range: LineRange, shouldRewrite?: boolean) {
         
         const text = this.view.getTextInRange(range);
-
-        // Collect context from neighboring lines
         const context = new RangeContext(range, this.view);
         
-        /* Copying and pasting sometimes adds an unwanted line break element
+        /* 
+         * Copying and pasting sometimes adds an unwanted line break element
          * following the pasted text. We check if this is the case, and if so,
          * remove it and redo the update.
          */
         if (context.nextLine && context.nextLine.tagName === "BR") {
             context.nextLine.remove();
-            this.updateRange(range, isOrigin);
+            this.updateRange(range, shouldRewrite);
             return;
         }
 
-        /* We feed context as options into the parser. We also need to save
+        /* 
+         * We feed context as options into the parser. We also need to save
          * the classes of the first and last lines so we can compare them to
          * the updated classes later.
          */
@@ -90,44 +105,33 @@ export class Editor {
             context.nextLineIsBlank,
             context.previousLineIsBlank
         );
-        const [firstLineStartingClass, lastLineStartingClass] = this.getBorderClasses(range);
+        const [firstLineStartClass, lastLineStartClass] = this.getBorderClasses(range);
 
-        // Use Fairfax to parse the full text and get multiline info
         const fairfaxDocument = this.parser.parse(text, parserOptions);
         this.mlManager.manage(fairfaxDocument, range);
-        console.log(this.mlManager.activeRanges);
         
-        /* If this range overlaps with any active multiline ranges, then we
-         * should parse that entire range along with this one.
+        /* 
+         * If this range overlaps with any active multiline ranges, then we
+         * should combine that range with this one and parse the whole thing.
          */
-        for (let multiline of this.mlManager.activeRanges) {
-            if (range.overlaps(multiline.range) &&
-                !range.includes(multiline.range)) {
-                console.log("Multiline range detected");
-                for (let activeRange of this.mlManager.activeRanges) {
-                    console.log(activeRange.range);
-                }
-                console.log(range);
-                this.updateRange(range.extend(multiline.range), true);
-                return;
-            }
-        }
+        const overlap = this.mlManager.multilinesOverlap(range);
+        if (overlap) this.updateRange(range.extend(overlap), true);
 
-        // Render the blocks into the View
-        const shouldRewrite = isOrigin || false;
-        this.view.updateRange(range, fairfaxDocument.blocks, shouldRewrite);
+        this.view.updateRange(range, fairfaxDocument.blocks, shouldRewrite ?? false);
 
-        /* Collect the updated class names. If they changed as a result of
+        /* 
+         * Collect the updated class names. If they changed as a result of
          * parsing, then we should update the neighboring lines as well.
          *
          * This is a form of indirect recursion and technically has the
          * potential for overflow. However, there are no Fountain elements I
          * can think of at the moment that would cause that.
          */
-        const [firstLineEndingClass, lastLineEndingClass] = this.getBorderClasses(range);
-        if (firstLineStartingClass != firstLineEndingClass ||
-            lastLineStartingClass != lastLineEndingClass) {
-
+        const [firstLineEndClass, lastLineEndClass] = this.getBorderClasses(range);
+        if (
+            firstLineStartClass != firstLineEndClass ||
+            lastLineStartClass != lastLineEndClass
+        ) {
             this.updateNeighbors(context);
         }
     }
@@ -140,8 +144,6 @@ export class Editor {
     getBorderClasses(range: LineRange): [string | undefined, string | undefined] {
         const firstLine = this.view.getLineAt(range.start);
         const lastLine = this.view.getLineAt(range.end);
-        const firstLineClass = firstLine ? firstLine.className : undefined;
-        const lastLineClass = lastLine ? lastLine.className : undefined;
-        return [firstLineClass, lastLineClass];
+        return [firstLine?.className, lastLine?.className];
     }
 }

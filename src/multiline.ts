@@ -14,31 +14,23 @@ export class MultilineRange {
 
 export class MultilineEnd {
     type: MultilineType;
-    start: number | undefined;
-    end: number | undefined;
+    index: number;
+    forward: boolean;
 
-    constructor(type: MultilineType, start?: number, end?: number) {
+    constructor(type: MultilineType, index: number, forward: boolean) {
         this.type = type;
-        this.start = start;
-        this.end = end;
+        this.index = index;
+        this.forward = forward;
     }
 
     isInRange(range: LineRange) {
-        if (typeof this.start === "number" &&
-            range.includesIndex(this.start)) {
-            return true;
-        }
-        if (typeof this.end === "number" &&
-            range.includesIndex(this.end)) {
-            return true;
-        }
-        return false;
+        return range.includesIndex(this.index);
     }
 }
 
 export class MultilineManager {
-    activeRanges: Set<MultilineRange> = new Set();
-    openEnds: MultilineEnd[] = [];
+    activeMultilines: Set<MultilineRange> = new Set();
+    openMultilines: MultilineEnd[] = [];
     view: View;
 
     constructor(view: View) {
@@ -48,109 +40,94 @@ export class MultilineManager {
     manage(fairfaxDocument: Document, range: LineRange) {
 
         // Clear any active ranges that are being reprocessed
-        for (let activeRange of this.activeRanges) {
-            if (range.includes(activeRange.range)) {
-                this.activeRanges.delete(activeRange);
+        for (let multiline of this.activeMultilines) {
+            if (range.includesRange(multiline.range)) {
+                this.activeMultilines.delete(multiline);
             }
         }
 
         // Splice out any open ranges that are being reprocessed
-        for (let i = this.openEnds.length - 1; i >= 0; i--) {
-            const openEnd = this.openEnds[i];
+        for (let i = this.openMultilines.length - 1; i >= 0; i--) {
+            const openEnd = this.openMultilines[i];
             if (openEnd.isInRange(range)) {
-                this.openEnds.splice(i, 1);
+                this.openMultilines.splice(i, 1);
             } 
         }
 
-        for (let activeMultiline of fairfaxDocument.activeMultilines) {
-            if (typeof activeMultiline.startLine === "undefined" ||
-                typeof activeMultiline.endLine === "undefined") continue;
-            this.activeRanges.add(new MultilineRange(
-                activeMultiline.type,
-                new LineRange(activeMultiline.startLine + range.start, activeMultiline.endLine + range.start)
+        // Add completed multiline structures to active ranges
+        for (let structure of fairfaxDocument.activeMultilines) {
+            const start = structure.start + range.start;
+            const end = structure.end + range.start;
+            this.activeMultilines.add(new MultilineRange(
+                structure.type,
+                new LineRange(start, end)
             ));
         }
-        for (let openMultiline of fairfaxDocument.openMultilines) {
-            if (typeof openMultiline.startLine === "undefined") {
-                if (typeof openMultiline.endLine === "undefined") continue;
-                const end = new MultilineEnd(
-                    openMultiline.type,
-                    undefined,
-                    openMultiline.endLine + range.start
-                );
-                this.tryClosing(end);
-            }
-            if (typeof openMultiline.endLine === "undefined") {
-                if (typeof openMultiline.startLine === "undefined") continue;
-                const end = new MultilineEnd(
-                    openMultiline.type,
-                    openMultiline.startLine + range.start
-                );
-                this.tryClosing(end);
-            }
+
+        // Collect open structures and see if we have any matches
+        for (let structure of fairfaxDocument.openMultilines) {
+            const end = new MultilineEnd(
+                structure.type,
+                structure.index,
+                structure.forward
+            );
+            this.tryClosing(end);
         }
     }
 
     tryClosing(end: MultilineEnd) {
-        // We're looking backwards
-        if (typeof end.start === "undefined") {
-            if (typeof end.end === "undefined") return;
-            for (let i = this.openEnds.length - 1; i >= 0; i--) {
-                const otherEnd = this.openEnds[i];
-                if (end.type === otherEnd.type &&
-                    typeof otherEnd.start !== "undefined" &&
-                    otherEnd.start < end.end) {
-
+        // Looking forwards
+        if (end.forward) {
+            for (let i = 0; i < this.openMultilines.length; i++) {
+                const otherEnd = this.openMultilines[i];
+                if (
+                    end.type === otherEnd.type &&
+                    otherEnd.index > end.index &&
+                    !otherEnd.forward
+                ) {
+                    this.close(end, otherEnd, i);
+                    return;
+                }
+            }
+        } else {
+        // Looking backwards
+            for (let i = this.openMultilines.length - 1; i >= 0; i--) {
+                const otherEnd = this.openMultilines[i];
+                if (
+                    end.type === otherEnd.type &&
+                    otherEnd.index < end.index &&
+                    otherEnd.forward
+                ) {
                     this.close(otherEnd, end, i);
                     return;
                 }
             }
         }
-        // Looking forwards
-        if (typeof end.end === "undefined") {
-            if (typeof end.start === "undefined") return;
-            for (let i = 0; i < this.openEnds.length; i++) {
-                const otherEnd = this.openEnds[i];
-                if (end.type === otherEnd.type &&
-                    typeof otherEnd.end !== "undefined" &&
-                    otherEnd.end >= end.start) {
 
-                    this.close(end, otherEnd, i);
-                    return;
-                }
-            }
-        }
         // Didn't find any matches
-        this.openEnds.push(end); 
+        this.openMultilines.push(end); 
     }
 
     close(start: MultilineEnd, end: MultilineEnd, index: number) {
-        if (typeof start.start === "undefined" ||
-            typeof end.end === "undefined") return;
-        this.openEnds.splice(index, 1);
-        this.activeRanges.add(new MultilineRange(
+        this.openMultilines.splice(index, 1);
+        this.activeMultilines.add(new MultilineRange(
             start.type,
-            new LineRange(start.start, end.end)
+            new LineRange(start.index, end.index)
         ));
     }
 
-    insertLine(index: number) {
-        for (let range of this.activeRanges) {
-
-            /* We can't keep extending the title page, or else it will extend
-             * over the full document. If we're leaving a blank line, we don't
-             * update the range.
-            if (range.type === MultilineType.TitlePage) {
-                const previousLine = this.view.getLineAt(index - 1);
-                if (previousLine && previousLine.classList.contains("BlankLine")) {
-                    continue;
-                }
-            }
-             */
-            if (range.range.includesIndex(index)) {
-                console.log("Extending multiline");
-                range.range.end += 1;
-            }
+    /* 
+     * Check if the given range overlaps with any active multiline ranges. Note
+     * that we exclude the case where the given range is larger than or equal to
+     * an active range, as we're already processing the active range if so.
+     */
+    multilinesOverlap(range: LineRange): LineRange | undefined {
+        for (let multiline of this.activeMultilines) {
+            if (
+                multiline.range.overlaps(range) &&
+                !range.includesRange(multiline.range)
+            ) return multiline.range;
         }
+        return;
     }
 }

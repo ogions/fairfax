@@ -39,7 +39,6 @@ export class RangeContext {
         } else {
             if (range.start === 0) this.isDocumentStart = true;
         }
-
         if (this.nextLine) {
             this.nextLineIsBlank = this.nextLine.classList.contains("BlankLine");
         }
@@ -52,7 +51,8 @@ export class LineRange {
     end: number;
 
     constructor(start: number, end: number) {
-        /* This ensures that the range is well-formed by flipping the start
+        /* 
+         * Ensure that the range is well-formed by flipping the start
          * and end parameters if the start is greater than the end.
          */
         if (start <= end) {
@@ -65,18 +65,24 @@ export class LineRange {
     }
 
     overlaps(range: LineRange): boolean {
-        return (this.start <= range.end &&
-            range.start <= this.end)
+        return (
+            this.start <= range.end &&
+            range.start <= this.end
+        );
     }
 
-    includes(range: LineRange): boolean {
-        return (this.start <= range.start &&
-            this.end >= range.end);
+    includesRange(range: LineRange): boolean {
+        return (
+            this.start <= range.start &&
+            this.end >= range.end
+        );
     }
 
     includesIndex(index: number): boolean {
-        return (this.start <= index &&
-            this.end >= index);
+        return (
+            this.start <= index &&
+            this.end >= index
+        );
     }
 
     extend(range: LineRange): LineRange {
