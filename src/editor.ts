@@ -115,7 +115,11 @@ export class Editor {
          * should combine that range with this one and parse the whole thing.
          */
         const overlap = this.mlManager.multilinesOverlap(range);
-        if (overlap) this.updateRange(range.extend(overlap), true);
+        if (overlap) {
+            console.log("Overlap detected");
+            this.updateRange(range.extend(overlap), true);
+            return;
+        }
 
         this.view.updateRange(range, fairfaxDocument.blocks, shouldRewrite ?? false);
 

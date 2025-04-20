@@ -68,7 +68,7 @@ export class MultilineManager {
         for (let structure of fairfaxDocument.openMultilines) {
             const end = new MultilineEnd(
                 structure.type,
-                structure.index,
+                structure.index + range.start,
                 structure.forward
             );
             this.tryClosing(end);
@@ -76,6 +76,12 @@ export class MultilineManager {
     }
 
     tryClosing(end: MultilineEnd) {
+        /* 
+         * N.B. We don't try to close multilines on the same line. That's the
+         * responsibiity of the parser. It also means we don't have to look at
+         * inline offsets/token indexes, which reduces complexity a lot.
+         */
+
         // Looking forwards
         if (end.forward) {
             for (let i = 0; i < this.openMultilines.length; i++) {
@@ -86,7 +92,6 @@ export class MultilineManager {
                     !otherEnd.forward
                 ) {
                     this.close(end, otherEnd, i);
-                    return;
                 }
             }
         } else {
@@ -99,21 +104,21 @@ export class MultilineManager {
                     otherEnd.forward
                 ) {
                     this.close(otherEnd, end, i);
-                    return;
                 }
             }
         }
 
         // Didn't find any matches
-        this.openMultilines.push(end); 
+        this.openMultilines.push(end);
     }
 
     close(start: MultilineEnd, end: MultilineEnd, index: number) {
         this.openMultilines.splice(index, 1);
-        this.activeMultilines.add(new MultilineRange(
+        const range = new MultilineRange(
             start.type,
             new LineRange(start.index, end.index)
-        ));
+        );
+        this.activeMultilines.add(range);
     }
 
     /* 

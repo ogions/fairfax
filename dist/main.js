@@ -898,7 +898,7 @@
       for (let structure of fairfaxDocument.openMultilines) {
         const end = new MultilineEnd(
           structure.type,
-          structure.index,
+          structure.index + range.start,
           structure.forward
         );
         this.tryClosing(end);
@@ -910,7 +910,6 @@
           const otherEnd = this.openMultilines[i];
           if (end.type === otherEnd.type && otherEnd.index > end.index && !otherEnd.forward) {
             this.close(end, otherEnd, i);
-            return;
           }
         }
       } else {
@@ -918,7 +917,6 @@
           const otherEnd = this.openMultilines[i];
           if (end.type === otherEnd.type && otherEnd.index < end.index && otherEnd.forward) {
             this.close(otherEnd, end, i);
-            return;
           }
         }
       }
@@ -926,10 +924,11 @@
     }
     close(start, end, index) {
       this.openMultilines.splice(index, 1);
-      this.activeMultilines.add(new MultilineRange(
+      const range = new MultilineRange(
         start.type,
         new LineRange(start.index, end.index)
-      ));
+      );
+      this.activeMultilines.add(range);
     }
     /* 
      * Check if the given range overlaps with any active multiline ranges. Note
@@ -1175,6 +1174,7 @@
         const lineRange = new LineRange(lineIndex, lineIndex);
         const overlap = this.mlManager.multilinesOverlap(lineRange);
         if (overlap) {
+          console.log("Handling addition within ML");
           const extendedRange = new LineRange(overlap.start, overlap.end + 1);
           this.updateRange(lineRange.extend(extendedRange), true);
           return;
@@ -1210,7 +1210,11 @@
       const fairfaxDocument = this.parser.parse(text, parserOptions);
       this.mlManager.manage(fairfaxDocument, range);
       const overlap = this.mlManager.multilinesOverlap(range);
-      if (overlap) this.updateRange(range.extend(overlap), true);
+      if (overlap) {
+        console.log("Overlap detected");
+        this.updateRange(range.extend(overlap), true);
+        return;
+      }
       this.view.updateRange(range, fairfaxDocument.blocks, shouldRewrite ?? false);
       const [firstLineEndClass, lastLineEndClass] = this.getBorderClasses(range);
       if (firstLineStartClass != firstLineEndClass || lastLineStartClass != lastLineEndClass) {
