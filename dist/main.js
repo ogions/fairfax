@@ -31,6 +31,9 @@
       this.content = content;
       if (centered) this.centered = centered;
     }
+    allowsInlineStyles() {
+      return !(this.type === 9 /* SectionHeading */ || this.type === 10 /* Synopsis */);
+    }
   };
   var RunToken = class {
     constructor(type, content) {
@@ -390,9 +393,7 @@
       // Inline flags
       this.isEscaped = false;
       this.nextChar = "";
-      this.openBoneyards = [];
-      this.openNotes = [];
-      this.openInlines = [];
+      this.multilineTokens = [];
       this.textBuffer = "";
       this.tokenizer = new Tokenizer();
     }
@@ -402,9 +403,7 @@
       this.previousLineIsBlank = options.previousLineIsBlank;
       const lines = chunk.split("\n");
       const tokens = [];
-      this.openBoneyards = [];
-      this.openNotes = [];
-      this.openInlines = [];
+      this.multilineTokens = [];
       if (this.isDocumentStart && Tokenizer.regexes.titlePageKey.test(lines[0])) {
         this.isDocumentStart = false;
         for (let i = 0; i < lines.length; i++) {
@@ -448,6 +447,9 @@
         }
         const token = this.tokenizer.tokenizeChar(line[i], this);
         this.isEscaped = token.type === 10 /* Escape */;
+        if (token.isMultilineStyle()) {
+          this.multilineTokens.push(token);
+        }
         if (token.type === 22 /* Text */) {
           this.textBuffer += token.content;
         } else {
@@ -588,7 +590,7 @@
       if (token.type === 17 /* TitlePageKey */) {
         return /* @__PURE__ */ new Set([6 /* TitlePageKey */]);
       }
-      return this.activeStyles;
+      return new Set(this.activeStyles);
     }
     process(token) {
       if (token.active) {
@@ -600,9 +602,6 @@
           this.activeStyles.add(style);
         }
       }
-    }
-    isMultiline(token) {
-      return token.type === 13 /* BoneyardOpen */ || token.type === 14 /* BoneyardClose */ || token.type === 11 /* NoteOpen */ || token.type === 12 /* NoteClose */;
     }
   };
 
@@ -651,11 +650,11 @@
         options.nextLineIsBlank,
         options.previousLineIsBlank
       );
+      this.isInDualDialogue = options.isInDualDialogue;
       const tokens = this.lexer.lex(chunk, lexerOptions);
       const titlePage = /* @__PURE__ */ new Map();
       const blocks = [];
       this.mlManager.reset();
-      this.isInDualDialogue = options.isInDualDialogue;
       if (options.isDocumentStart) {
         for (let [i, token] of tokens.entries()) {
           if (token.type === 11 /* TitlePage */) {
@@ -677,13 +676,13 @@
           this.mlManager.closeTitlePage(tokens.length - 1);
         }
       }
-      this.parseBoneyards(tokens);
-      this.parseNotes(tokens);
+      this.parseBoneyards();
+      this.parseNotes();
       for (let [i, token] of tokens.entries()) {
         this.parseInlines(token.content);
         const blockType = this.isInNote ? 2 /* Action */ : _Parser.typeMap.get(token.type) ?? 2 /* Action */;
         if (blockType === 0 /* BlankLine */) this.isInDualDialogue = false;
-        const runs = this.parseBlock(token.content, i);
+        const runs = this.parseBlock(token, i);
         blocks.push(new Block(
           blockType,
           runs,
@@ -698,19 +697,47 @@
         this.mlManager.openMultilines
       );
     }
-    parseBlock(tokens, lineIndex) {
+    parseBlock(blockToken, lineIndex) {
       const runs = [];
-      for (let token of tokens) {
-        if (token.type === 5 /* DualDialogue */) {
-          this.isInDualDialogue = true;
+      if (blockToken instanceof BlockToken) {
+        for (let token of blockToken.content) {
+          if (token.type === 18 /* TitlePageValue */) {
+            return [...runs, ...this.parseBlock(token, lineIndex)];
+          }
+          if (typeof token.content !== "string") continue;
+          if (token.type === 5 /* DualDialogue */) {
+            this.isInDualDialogue = true;
+          }
+          if (token.isMultilineStyle()) {
+            this.mlManager.manage(token, lineIndex);
+          }
+          const text = token.content;
+          if (blockToken.allowsInlineStyles()) {
+            const styles = this.stylizer.stylize(token);
+            runs.push(new Run(text, styles));
+          } else {
+            const styles = token.type === 15 /* SectionHeadingLeader */ || token.type === 16 /* SynopsisLeader */ ? this.stylizer.stylize(token) : /* @__PURE__ */ new Set([]);
+            runs.push(new Run(text, styles));
+          }
         }
-        if (token.type === 18 /* TitlePageValue */ && Array.isArray(token.content)) {
-          return [...runs, ...this.parseBlock(token.content, lineIndex)];
+      } else {
+        if (typeof blockToken.content === "string") return [];
+        this.parseInlines(blockToken.content);
+        for (let token of blockToken.content) {
+          if (typeof token.content !== "string") continue;
+          if (token.isMultilineStyle()) {
+            this.mlManager.manage(token, lineIndex);
+          }
+          const text = token.content;
+          const styles = this.stylizer.stylize(token);
+          console.log(styles);
+          if (styles.has(3 /* Boneyard */) || styles.has(4 /* Note */)) {
+            console.log(text + " has boneyard or note style");
+          } else {
+            styles.add(7 /* TitlePageValue */);
+          }
+          runs.push(new Run(text, styles));
         }
-        if (token.isMultilineStyle()) this.mlManager.manage(token, lineIndex);
-        const text = typeof token.content === "string" ? token.content : "";
-        const styles = this.stylizer.stylize(token);
-        runs.push(new Run(text, new Set(styles)));
       }
       return runs;
     }
@@ -729,44 +756,36 @@
         }
       }
     }
-    parseBoneyards(tokens) {
+    parseBoneyards() {
       let openBoneyard;
-      for (let blockToken of tokens) {
-        for (let runToken of blockToken.content) {
-          if (Array.isArray(runToken)) continue;
-          if (!(runToken instanceof StyleToken)) continue;
-          if (runToken.type === 13 /* BoneyardOpen */) {
-            openBoneyard = runToken;
-          } else if (runToken.type === 14 /* BoneyardClose */) {
-            if (openBoneyard) {
-              openBoneyard.active = true;
-              runToken.active = true;
-              openBoneyard = void 0;
-            }
+      for (let token of this.lexer.multilineTokens) {
+        if (token.type === 13 /* BoneyardOpen */) {
+          openBoneyard = token;
+        } else if (token.type === 14 /* BoneyardClose */) {
+          if (openBoneyard) {
+            openBoneyard.active = true;
+            token.active = true;
+            openBoneyard = void 0;
           }
         }
       }
     }
-    parseNotes(tokens) {
+    parseNotes() {
       let openNote;
       let isInBoneyard = false;
-      for (let blockToken of tokens) {
-        for (let runToken of blockToken.content) {
-          if (Array.isArray(runToken)) continue;
-          if (!(runToken instanceof StyleToken)) continue;
-          if (runToken.active) {
-            if (runToken.type === 13 /* BoneyardOpen */) isInBoneyard = true;
-            if (runToken.type === 14 /* BoneyardClose */) isInBoneyard = false;
-          }
-          if (isInBoneyard) continue;
-          if (runToken.type === 11 /* NoteOpen */) {
-            openNote = runToken;
-          } else if (runToken.type === 12 /* NoteClose */) {
-            if (openNote) {
-              openNote.active = true;
-              runToken.active = true;
-              openNote = void 0;
-            }
+      for (let token of this.lexer.multilineTokens) {
+        if (token.active) {
+          if (token.type === 13 /* BoneyardOpen */) isInBoneyard = true;
+          if (token.type === 14 /* BoneyardClose */) isInBoneyard = false;
+        }
+        if (isInBoneyard) continue;
+        if (token.type === 11 /* NoteOpen */) {
+          openNote = token;
+        } else if (token.type === 12 /* NoteClose */) {
+          if (openNote) {
+            openNote.active = true;
+            token.active = true;
+            openNote = void 0;
           }
         }
       }
@@ -776,12 +795,10 @@
       for (let token of tokens) {
         if (!(token instanceof StyleToken)) continue;
         if (token.active) {
-          if (token.type === 13 /* BoneyardOpen */) this.isInBoneyard = true;
-          if (token.type === 14 /* BoneyardClose */) this.isInBoneyard = false;
           if (token.type === 11 /* NoteOpen */) this.isInNote = true;
           if (token.type === 12 /* NoteClose */) this.isInNote = false;
         }
-        if (this.isInBoneyard || this.isInNote) continue;
+        if (this.isInNote) continue;
         if (token.type === 20 /* Bold */ || token.type === 19 /* Italic */ || token.type === 21 /* Underline */) {
           for (let i = openInlines.length - 1; i >= 0; i--) {
             const openInline = openInlines[i];
@@ -1174,7 +1191,6 @@
         const lineRange = new LineRange(lineIndex, lineIndex);
         const overlap = this.mlManager.multilinesOverlap(lineRange);
         if (overlap) {
-          console.log("Handling addition within ML");
           const extendedRange = new LineRange(overlap.start, overlap.end + 1);
           this.updateRange(lineRange.extend(extendedRange), true);
           return;
@@ -1211,7 +1227,6 @@
       this.mlManager.manage(fairfaxDocument, range);
       const overlap = this.mlManager.multilinesOverlap(range);
       if (overlap) {
-        console.log("Overlap detected");
         this.updateRange(range.extend(overlap), true);
         return;
       }

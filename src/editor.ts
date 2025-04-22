@@ -116,7 +116,6 @@ export class Editor {
          */
         const overlap = this.mlManager.multilinesOverlap(range);
         if (overlap) {
-            console.log("Overlap detected");
             this.updateRange(range.extend(overlap), true);
             return;
         }
