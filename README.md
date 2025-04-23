@@ -19,3 +19,15 @@ Monica works within a browser. To initialize it, load the Monica module and then
     <main id="monica"></main>
 </body>
 ```
+
+Monica does not itself provide CSS for styling the screenplay, but a set of reasonable defaults is available at `dist/style.css`.
+
+## License
+
+Monica is available under the MIT license.
+
+---
+
+Zach Lo
+
+https://zachlo.com
