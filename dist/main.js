@@ -375,7 +375,7 @@
   };
 
   // ../fairfax/src/lexer.ts
-  var LexerOptions = class {
+  var LexerContext = class {
     constructor(isDocumentStart, isInDialogue, nextLineIsBlank, previousLineIsBlank) {
       this.isDocumentStart = isDocumentStart;
       this.isInDialogue = isInDialogue;
@@ -393,14 +393,14 @@
       // Inline flags
       this.isEscaped = false;
       this.nextChar = "";
+      this.tokenizer = new Tokenizer();
       this.multilineTokens = [];
       this.textBuffer = "";
-      this.tokenizer = new Tokenizer();
     }
-    lex(chunk, options) {
-      this.isDocumentStart = options.isDocumentStart;
-      this.isInDialogue = options.isInDialogue;
-      this.previousLineIsBlank = options.previousLineIsBlank;
+    lex(chunk, context) {
+      this.isDocumentStart = context.isDocumentStart;
+      this.isInDialogue = context.isInDialogue;
+      this.previousLineIsBlank = context.previousLineIsBlank;
       const lines = chunk.split("\n");
       const tokens = [];
       this.multilineTokens = [];
@@ -421,7 +421,7 @@
           const nextLine = lines[i + 1];
           this.nextLineIsBlank = !nextLine;
         } else {
-          this.nextLineIsBlank = options.nextLineIsBlank;
+          this.nextLineIsBlank = context.nextLineIsBlank;
         }
         const token = this.tokenizer.tokenizeLine(lines[i], this);
         if (token.type === 0 /* BlankLine */ || token.type === 8 /* PageBreak */) {
@@ -576,10 +576,11 @@
         [12 /* NoteClose */, 4 /* Note */]
       ]);
     }
-    stylize(token) {
+    stylize(token, allowInlineStyles) {
+      allowInlineStyles = allowInlineStyles ?? true;
       if (token instanceof StyleToken) {
-        const styles = new Set(this.activeStyles).add(5 /* Special */);
-        this.process(token);
+        const styles = new Set(this.activeStyles);
+        this.process(token, styles, allowInlineStyles);
         if (token.active) {
           return styles;
         }
@@ -592,21 +593,29 @@
       }
       return new Set(this.activeStyles);
     }
-    process(token) {
+    process(token, styles, allowInlineStyles) {
       if (token.active) {
         const style = _Stylizer.styleMap.get(token.type);
         if (style === void 0) return;
         if (this.activeStyles.has(style)) {
           this.activeStyles.delete(style);
+          styles.delete(style);
+          styles.add(5 /* Special */);
         } else {
-          this.activeStyles.add(style);
+          if (!(this.isInlineStyle(style) && !allowInlineStyles)) {
+            this.activeStyles.add(style);
+            styles.add(5 /* Special */);
+          }
         }
       }
+    }
+    isInlineStyle(style) {
+      return style === 0 /* Bold */ || style === 1 /* Italic */ || style === 2 /* Underline */;
     }
   };
 
   // ../fairfax/src/parser.ts
-  var ParserOptions = class {
+  var ParserContext = class {
     constructor(isDocumentStart, isInDialogue, isInDualDialogue, nextLineIsBlank, previousLineIsBlank) {
       this.isDocumentStart = isDocumentStart ?? false;
       this.isInDialogue = isInDialogue ?? false;
@@ -621,11 +630,11 @@
       this.mlManager = new MultilineManager();
       this.stylizer = new Stylizer();
       this.activeStyles = /* @__PURE__ */ new Set();
+      this.openTitlePageKey = "";
+      this.openTitlePageValue = [];
       this.isInBoneyard = false;
       this.isInDualDialogue = false;
       this.isInNote = false;
-      this.openTitlePageKey = "";
-      this.openTitlePageValue = [];
     }
     static {
       this.typeMap = /* @__PURE__ */ new Map([
@@ -643,19 +652,19 @@
         [11 /* TitlePage */, 11 /* TitlePage */]
       ]);
     }
-    parse(chunk, options) {
-      const lexerOptions = new LexerOptions(
-        options.isDocumentStart,
-        options.isInDialogue,
-        options.nextLineIsBlank,
-        options.previousLineIsBlank
+    parse(chunk, context) {
+      const lexerContext = new LexerContext(
+        context.isDocumentStart,
+        context.isInDialogue,
+        context.nextLineIsBlank,
+        context.previousLineIsBlank
       );
-      this.isInDualDialogue = options.isInDualDialogue;
-      const tokens = this.lexer.lex(chunk, lexerOptions);
+      this.isInDualDialogue = context.isInDualDialogue;
+      const tokens = this.lexer.lex(chunk, lexerContext);
       const titlePage = /* @__PURE__ */ new Map();
       const blocks = [];
       this.mlManager.reset();
-      if (options.isDocumentStart) {
+      if (context.isDocumentStart) {
         for (let [i, token] of tokens.entries()) {
           if (token.type === 11 /* TitlePage */) {
             this.parseTitlePageBlock(token.content, titlePage);
@@ -712,13 +721,8 @@
             this.mlManager.manage(token, lineIndex);
           }
           const text = token.content;
-          if (blockToken.allowsInlineStyles()) {
-            const styles = this.stylizer.stylize(token);
-            runs.push(new Run(text, styles));
-          } else {
-            const styles = token.type === 15 /* SectionHeadingLeader */ || token.type === 16 /* SynopsisLeader */ ? this.stylizer.stylize(token) : /* @__PURE__ */ new Set([]);
-            runs.push(new Run(text, styles));
-          }
+          const styles = this.stylizer.stylize(token, blockToken.allowsInlineStyles());
+          runs.push(new Run(text, styles));
         }
       } else {
         if (typeof blockToken.content === "string") return [];
@@ -730,10 +734,7 @@
           }
           const text = token.content;
           const styles = this.stylizer.stylize(token);
-          console.log(styles);
-          if (styles.has(3 /* Boneyard */) || styles.has(4 /* Note */)) {
-            console.log(text + " has boneyard or note style");
-          } else {
+          if (!(styles.has(3 /* Boneyard */) || styles.has(4 /* Note */) || styles.has(5 /* Special */))) {
             styles.add(7 /* TitlePageValue */);
           }
           runs.push(new Run(text, styles));
@@ -1215,7 +1216,7 @@
         this.updateRange(range, shouldRewrite);
         return;
       }
-      const parserOptions = new ParserOptions(
+      const parserContext = new ParserContext(
         context.isDocumentStart,
         context.isInDialogue,
         context.isInDualDialogue,
@@ -1223,7 +1224,7 @@
         context.previousLineIsBlank
       );
       const [firstLineStartClass, lastLineStartClass] = this.getBorderClasses(range);
-      const fairfaxDocument = this.parser.parse(text, parserOptions);
+      const fairfaxDocument = this.parser.parse(text, parserContext);
       this.mlManager.manage(fairfaxDocument, range);
       const overlap = this.mlManager.multilinesOverlap(range);
       if (overlap) {

@@ -1,4 +1,4 @@
-import { Parser, ParserOptions } from "fairfax";
+import { Parser, ParserContext } from "fairfax";
 import { MultilineManager } from "./multiline";
 import { RangeContext, LineRange } from "./range";
 import { View } from "./view";
@@ -98,7 +98,7 @@ export class Editor {
          * the classes of the first and last lines so we can compare them to
          * the updated classes later.
          */
-        const parserOptions = new ParserOptions(
+        const parserContext = new ParserContext(
             context.isDocumentStart,
             context.isInDialogue,
             context.isInDualDialogue,
@@ -107,7 +107,7 @@ export class Editor {
         );
         const [firstLineStartClass, lastLineStartClass] = this.getBorderClasses(range);
 
-        const fairfaxDocument = this.parser.parse(text, parserOptions);
+        const fairfaxDocument = this.parser.parse(text, parserContext);
         this.mlManager.manage(fairfaxDocument, range);
         
         /* 
