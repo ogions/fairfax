@@ -26,6 +26,7 @@ export class View {
         [RunStyle.Underline, "Underline"],
         [RunStyle.Boneyard, "Boneyard"],
         [RunStyle.Note, "Note"],
+        [RunStyle.SceneNumber, "SceneNumber"],
         [RunStyle.Special, "Special"],
         [RunStyle.TitlePageKey, "TitlePageKey"],
         [RunStyle.TitlePageValue, "TitlePageValue"]
@@ -181,8 +182,10 @@ export class View {
                 const span = document.createElement("span");
                 span.textContent = run.text;
                 for (let style of run.styles) {
-                    const runClass = this.styleMap.get(style) ?? "";
-                    span.classList.add(runClass);
+                    const runClass = this.styleMap.get(style);
+                    if (typeof runClass === "string") {
+                        span.classList.add(runClass);
+                    }
                 }
                 fragment.append(span);
             }

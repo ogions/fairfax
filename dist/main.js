@@ -265,6 +265,12 @@
       );
     }
     tokenizeTitlePage(line, lexer) {
+      if (!line) {
+        return new BlockToken(
+          0 /* BlankLine */,
+          []
+        );
+      }
       if (_Tokenizer.regexes.titlePageKey.test(line)) {
         const matches = _Tokenizer.regexes.titlePageKey.exec(line);
         const key = matches ? matches[1] : "";
@@ -586,10 +592,13 @@
         }
       }
       if (token.type === 0 /* SceneHeadingForce */ || token.type === 2 /* SceneNumberFence */ || token.type === 3 /* ActionForce */ || token.type === 4 /* CharacterForce */ || token.type === 5 /* DualDialogue */ || token.type === 6 /* LyricLeader */ || token.type === 7 /* TransitionForce */ || token.type === 15 /* SectionHeadingLeader */ || token.type === 16 /* SynopsisLeader */) {
-        return /* @__PURE__ */ new Set([5 /* Special */]);
+        return /* @__PURE__ */ new Set([6 /* Special */]);
+      }
+      if (token.type === 1 /* SceneNumber */) {
+        return /* @__PURE__ */ new Set([5 /* SceneNumber */]);
       }
       if (token.type === 17 /* TitlePageKey */) {
-        return /* @__PURE__ */ new Set([6 /* TitlePageKey */]);
+        return /* @__PURE__ */ new Set([7 /* TitlePageKey */]);
       }
       return new Set(this.activeStyles);
     }
@@ -600,11 +609,11 @@
         if (this.activeStyles.has(style)) {
           this.activeStyles.delete(style);
           styles.delete(style);
-          styles.add(5 /* Special */);
+          styles.add(6 /* Special */);
         } else {
           if (!(this.isInlineStyle(style) && !allowInlineStyles)) {
             this.activeStyles.add(style);
-            styles.add(5 /* Special */);
+            styles.add(6 /* Special */);
           }
         }
       }
@@ -653,6 +662,7 @@
       ]);
     }
     parse(chunk, context) {
+      if (!context) context = new ParserContext();
       const lexerContext = new LexerContext(
         context.isDocumentStart,
         context.isInDialogue,
@@ -734,8 +744,8 @@
           }
           const text = token.content;
           const styles = this.stylizer.stylize(token);
-          if (!(styles.has(3 /* Boneyard */) || styles.has(4 /* Note */) || styles.has(5 /* Special */))) {
-            styles.add(7 /* TitlePageValue */);
+          if (!(styles.has(3 /* Boneyard */) || styles.has(4 /* Note */) || styles.has(6 /* Special */))) {
+            styles.add(8 /* TitlePageValue */);
           }
           runs.push(new Run(text, styles));
         }
@@ -1046,9 +1056,10 @@
         [2 /* Underline */, "Underline"],
         [3 /* Boneyard */, "Boneyard"],
         [4 /* Note */, "Note"],
-        [5 /* Special */, "Special"],
-        [6 /* TitlePageKey */, "TitlePageKey"],
-        [7 /* TitlePageValue */, "TitlePageValue"]
+        [5 /* SceneNumber */, "SceneNumber"],
+        [6 /* Special */, "Special"],
+        [7 /* TitlePageKey */, "TitlePageKey"],
+        [8 /* TitlePageValue */, "TitlePageValue"]
       ]);
       this.container = container2;
       this.selection = new ViewSelection(this);
@@ -1146,8 +1157,10 @@
           const span = document.createElement("span");
           span.textContent = run.text;
           for (let style of run.styles) {
-            const runClass = this.styleMap.get(style) ?? "";
-            span.classList.add(runClass);
+            const runClass = this.styleMap.get(style);
+            if (typeof runClass === "string") {
+              span.classList.add(runClass);
+            }
           }
           fragment.append(span);
         }

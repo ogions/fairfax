@@ -28,6 +28,10 @@ main {
     margin-left: 35%;
 }
 
+.PageBreak {
+    color: gray;
+}
+
 .Parenthetical {
     margin-left: 37%;
 }
@@ -70,6 +74,10 @@ main {
 
 .Note {
     color: green;
+}
+
+.SceneNumber {
+    color: blue;
 }
 
 .TitlePage {
