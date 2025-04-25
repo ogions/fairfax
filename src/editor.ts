@@ -36,6 +36,12 @@ export class Editor {
         this.view.updateRange(range, fairfaxDocument.blocks, true);
     }
 
+    getContent(): string {
+        const range = new LineRange(0, this.container.childElementCount - 1);
+        const content = this.view.getTextInRange(range);
+        return content;
+    }
+
     handleInput(e: InputEvent) {
         const activeLine = this.view.getActiveLine();
 
