@@ -10,11 +10,19 @@ Monica uses [Fairfax](https://github.com/ogions/fairfax), a Typescript-based par
 
 ## Usage
 
-Monica works within a browser. To initialize it, load the Monica module and then give an element the ID `"monica"`.
+Monica works within a browser. To initialize it, load the Monica module and create a new `Editor` with a container element as an argument.
 
 ```html
 <!DOCTYPE html>
-<head></head>
+<head>
+    <script type="module" src="monica.js"></script>
+    <script type="module" defer>
+        import { Editor } from "./monica.js";
+        const container = document.getElementById("monica");
+        if (container) new Editor(container);
+    </script>
+
+</head>
 <body>
     <main id="monica"></main>
 </body>
