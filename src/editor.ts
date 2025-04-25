@@ -21,10 +21,19 @@ export class Editor {
     }
 
     load(content: string) {
+        const parserContext = new ParserContext(
+            true,
+            false,
+            false,
+            true,
+            true
+        );
+        const fairfaxDocument = this.parser.parse(content, parserContext);
+        
         this.view.resetContainer();
-        const line = this.container.children[0] as HTMLElement;
-        line.innerText = content;
-        this.updateLine(line);
+        const range = new LineRange(0, 0);
+        this.mlManager.manage(fairfaxDocument, range);
+        this.view.updateRange(range, fairfaxDocument.blocks, true);
     }
 
     handleInput(e: InputEvent) {
