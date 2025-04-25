@@ -5,7 +5,7 @@
   "license": "ISC",
   "author": "Zach Lo",
   "type": "module",
-  "main": "monica.ts",
+  "main": "src/monica.ts",
   "scripts": {
     "build": "esbuild src/monica.ts --bundle --format=esm --outfile=dist/main.js",
     "test": "npm run build && http-server ./dist"
