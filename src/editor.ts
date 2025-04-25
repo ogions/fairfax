@@ -20,6 +20,13 @@ export class Editor {
         this.mlManager = new MultilineManager(this.view);
     }
 
+    load(content: string) {
+        this.view.resetContainer();
+        const line = this.container.children[0] as HTMLElement;
+        line.innerText = content;
+        this.updateLine(line);
+    }
+
     handleInput(e: InputEvent) {
         const activeLine = this.view.getActiveLine();
 
