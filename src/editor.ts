@@ -8,6 +8,7 @@ export class Editor {
     mlManager: MultilineManager;
     parser = new Parser();
     view: View;
+    title: string;
 
     constructor(container: HTMLElement) {
         this.container = container;
@@ -18,6 +19,7 @@ export class Editor {
 
         this.view = new View(container);
         this.mlManager = new MultilineManager(this.view);
+        this.title = "Untitled";
     }
 
     load(content: string) {
@@ -34,6 +36,8 @@ export class Editor {
         const range = new LineRange(0, 0);
         this.mlManager.manage(fairfaxDocument, range);
         this.view.updateRange(range, fairfaxDocument.blocks, true);
+
+        this.title = fairfaxDocument.titlePage.get("Title") || "Untitled";
     }
 
     getContent(): string {
