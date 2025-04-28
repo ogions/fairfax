@@ -765,15 +765,16 @@ var Parser = class _Parser {
   }
   parseTitlePageBlock(tokens, titlePage) {
     for (let token of tokens) {
-      const text = typeof token.content === "string" ? token.content : "";
       if (token.type === 17 /* TitlePageKey */) {
+        const text = typeof token.content === "string" ? token.content : "";
         if (this.openTitlePageKey && this.openTitlePageValue) {
           titlePage.set(this.openTitlePageKey, this.openTitlePageValue.join("\n"));
         }
         this.openTitlePageKey = text;
         this.openTitlePageValue = [];
       } else if (token.type === 18 /* TitlePageValue */) {
-        const value = text;
+        if (typeof token.content !== "object") return;
+        const value = token.content.map((t) => t.content).join("");
         this.openTitlePageValue.push(value);
       }
     }
@@ -1203,12 +1204,27 @@ var Editor = class {
     });
     this.view = new View(container);
     this.mlManager = new MultilineManager2(this.view);
+    this.title = "Untitled";
   }
   load(content) {
+    const parserContext = new ParserContext(
+      true,
+      false,
+      false,
+      true,
+      true
+    );
+    const fairfaxDocument = this.parser.parse(content, parserContext);
     this.view.resetContainer();
-    const line = this.container.children[0];
-    line.innerText = content;
-    this.updateLine(line);
+    const range = new LineRange(0, 0);
+    this.mlManager.manage(fairfaxDocument, range);
+    this.view.updateRange(range, fairfaxDocument.blocks, true);
+    this.title = fairfaxDocument.titlePage.get("Title") || "Untitled";
+  }
+  getContent() {
+    const range = new LineRange(0, this.container.childElementCount - 1);
+    const content = this.view.getTextInRange(range);
+    return content;
   }
   handleInput(e) {
     const activeLine = this.view.getActiveLine();
