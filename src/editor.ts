@@ -19,7 +19,7 @@ export class Editor {
 
         this.view = new View(container);
         this.mlManager = new MultilineManager(this.view);
-        this.title = "Untitled";
+        this.title = "";
     }
 
     load(content: string) {
