@@ -1,11 +1,10 @@
 import { Block, BlockType, RunStyle } from "fairfax";
 import { LineRange } from "./range";
-import { ViewSelection } from "./selection";
+import { InlineSelection } from "./selection";
 
 export class View {
 
     container: HTMLElement;
-    selection: ViewSelection;
     blockMap = new Map([
         [BlockType.BlankLine, "BlankLine"],
         [BlockType.Action, "Action"],
@@ -34,7 +33,6 @@ export class View {
 
     constructor(container: HTMLElement) {
         this.container = container;
-        this.selection = new ViewSelection(this);
         this.resetContainer();
     }
 
@@ -128,7 +126,14 @@ export class View {
     }
 
     updateRange(range: LineRange, blocks: Block[], shouldRewrite: boolean) {
-        this.selection.save();
+
+        // This is fragile, need to fix
+        const selection = document.getSelection();
+        if (!selection) return;
+        const anchor = selection.anchorNode;
+        if (!anchor) return;
+        const offset = selection.anchorOffset;
+        const inlineSelection = new InlineSelection(this, anchor, offset);
         for (let [i, block] of blocks.entries()) {
 
             let lineIndex = i + range.start;
@@ -165,7 +170,7 @@ export class View {
             if (shouldRewrite) this.writeLine(line, block);
             this.classLine(line, block);
         }
-        if (shouldRewrite) this.selection.render();
+        if (shouldRewrite) inlineSelection.renderIn(this);
     }
 
     writeLine(line: HTMLElement, block: Block) {

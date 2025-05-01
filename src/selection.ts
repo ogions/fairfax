@@ -1,46 +1,36 @@
 import { View } from "./view";
 
-export class ViewSelection {
+export class InlineSelection {
 
-    view: View;
-    offset: number;
+    offset = 0;
 
-    constructor(view: View) {
-        this.view = view;
-        this.offset = 0;
-    }
-
-    save() {
-        const selection = document.getSelection();
-        if (!selection) return;
-        let anchor = selection.anchorNode;
-        if (!anchor) return;
-        const activeLine = this.view.getLineElementFrom(anchor);
+    constructor(view: View, node: Node, offset: number) {
+        const activeLine = view.getLineElementFrom(node);
         if (!activeLine) return;
-
+        
         /* 
          * We need to make sure the anchor is a direct child of the line
          * element so that we'll find it when we iterate over child nodes.
          */
-        if (anchor.parentElement?.tagName === "SPAN") {
-            anchor = anchor.parentElement;
+        if (node.parentElement?.tagName === "SPAN") {
+            node = node.parentElement;
         }
-
+        
         const childNodes = Array.from(activeLine.childNodes);
-
+        
         /* 
-         * In some cases, the anchor might be the line element itself, so we
+         * In some cases, the target might be the line element itself, so we
          * take the combined offset of all previous nodes.
          */
-        if (anchor.nodeName === "DIV") {
+        if (node.nodeName === "DIV") {
             this.offset = this.sumNodeLengths(
                 childNodes,
                 0,
-                selection.anchorOffset
+                offset
             );
             return;
         }
-
+        
         /*
          * Otherwise we sum the length of every node up to the anchor node and
          * add the anchorOffset to get the final character count.
@@ -48,8 +38,8 @@ export class ViewSelection {
         this.offset = this.sumNodeLengths(
             childNodes,
             0,
-            childNodes.indexOf(anchor as ChildNode)
-        ) + selection.anchorOffset; 
+            childNodes.indexOf(node as ChildNode)
+        ) + offset; 
     }
 
     sumNodeLengths(nodes: ChildNode[], start: number, end: number) {
@@ -59,8 +49,8 @@ export class ViewSelection {
         );
     }
 
-    render() {
-        const activeLine = this.view.getActiveLine() ?? this.view.container;
+    renderIn(view: View) {
+        const activeLine = view.getActiveLine() ?? view.container;
         const selection = document.getSelection();
         if (!selection) return;
 
