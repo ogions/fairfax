@@ -135,6 +135,7 @@ export class Editor {
 
         const fairfaxDocument = this.parser.parse(text, parserContext);
         this.mlManager.manage(fairfaxDocument, range);
+        this.handleTitleChange(fairfaxDocument.titlePage.get("Title"));
         
         /* 
          * If this range overlaps with any active multiline ranges, then we
@@ -174,5 +175,12 @@ export class Editor {
         const firstLine = this.view.getLineAt(range.start);
         const lastLine = this.view.getLineAt(range.end);
         return [firstLine?.className, lastLine?.className];
+    }
+
+    handleTitleChange(newTitle: string | undefined) {
+        newTitle = newTitle ?? "";
+        if (this.title !== newTitle) {
+            this.title = newTitle;
+        }
     }
 }
