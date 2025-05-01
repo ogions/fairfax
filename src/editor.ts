@@ -43,6 +43,7 @@ export class Editor {
     getContent(): string {
         const range = new LineRange(0, this.container.childElementCount - 1);
         const content = this.view.getTextInRange(range);
+        this.updateEntire();
         return content;
     }
 
@@ -164,6 +165,11 @@ export class Editor {
         ) {
             this.updateNeighbors(context);
         }
+    }
+
+    updateEntire() {
+        const range = new LineRange(0, this.container.childElementCount - 1);
+        this.updateRange(range);
     }
 
     updateNeighbors(context: RangeContext) {
