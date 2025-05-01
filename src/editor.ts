@@ -37,7 +37,7 @@ export class Editor {
         this.mlManager.manage(fairfaxDocument, range);
         this.view.updateRange(range, fairfaxDocument.blocks, true);
 
-        this.title = fairfaxDocument.titlePage.get("Title") || "Untitled";
+        this.title = fairfaxDocument.titlePage.get("Title") || "";
     }
 
     getContent(): string {
