@@ -203,8 +203,7 @@ export class View {
     }
     
     classLine(line: HTMLElement, block: Block) {
-        const lineClass = this.blockMap.get(block.type) ?? "Action";
-        line.className = lineClass;
+        line.className = this.blockMap.get(block.type) ?? "Action";
         if (block.centered) {
             line.classList.add("Centered");
         }

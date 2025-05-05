@@ -774,8 +774,8 @@ var Parser = class _Parser {
         this.openTitlePageValue = [];
       } else if (token.type === 18 /* TitlePageValue */) {
         if (typeof token.content !== "object") return;
-        const value = token.content.map((t) => t.content).join("");
-        this.openTitlePageValue.push(value);
+        const value = token.content.map((t) => t.content).join("").trim();
+        if (value) this.openTitlePageValue.push(value);
       }
     }
   }
@@ -984,35 +984,28 @@ var MultilineManager2 = class {
 };
 
 // src/selection.ts
-var ViewSelection = class {
-  constructor(view) {
-    this.view = view;
+var InlineSelection = class {
+  constructor(view, node, offset) {
     this.offset = 0;
-  }
-  save() {
-    const selection = document.getSelection();
-    if (!selection) return;
-    let anchor = selection.anchorNode;
-    if (!anchor) return;
-    const activeLine = this.view.getLineElementFrom(anchor);
+    const activeLine = view.getLineElementFrom(node);
     if (!activeLine) return;
-    if (anchor.parentElement?.tagName === "SPAN") {
-      anchor = anchor.parentElement;
+    if (node.parentElement?.tagName === "SPAN") {
+      node = node.parentElement;
     }
     const childNodes = Array.from(activeLine.childNodes);
-    if (anchor.nodeName === "DIV") {
+    if (node.nodeName === "DIV") {
       this.offset = this.sumNodeLengths(
         childNodes,
         0,
-        selection.anchorOffset
+        offset
       );
       return;
     }
     this.offset = this.sumNodeLengths(
       childNodes,
       0,
-      childNodes.indexOf(anchor)
-    ) + selection.anchorOffset;
+      childNodes.indexOf(node)
+    ) + offset;
   }
   sumNodeLengths(nodes, start, end) {
     return nodes.slice(start, end).reduce(
@@ -1020,8 +1013,8 @@ var ViewSelection = class {
       0
     );
   }
-  render() {
-    const activeLine = this.view.getActiveLine() ?? this.view.container;
+  renderIn(view) {
+    const activeLine = view.getActiveLine() ?? view.container;
     const selection = document.getSelection();
     if (!selection) return;
     if (this.offset === 0) {
@@ -1074,7 +1067,6 @@ var View = class {
       [8 /* TitlePageValue */, "TitlePageValue"]
     ]);
     this.container = container;
-    this.selection = new ViewSelection(this);
     this.resetContainer();
   }
   resetContainer() {
@@ -1144,7 +1136,12 @@ var View = class {
     return lineText;
   }
   updateRange(range, blocks, shouldRewrite) {
-    this.selection.save();
+    const selection = document.getSelection();
+    if (!selection) return;
+    const anchor = selection.anchorNode;
+    if (!anchor) return;
+    const offset = selection.anchorOffset;
+    const inlineSelection = new InlineSelection(this, anchor, offset);
     for (let [i, block] of blocks.entries()) {
       let lineIndex = i + range.start;
       if (lineIndex >= this.container.children.length) {
@@ -1155,10 +1152,9 @@ var View = class {
       }
       let line = this.getLineAt(lineIndex);
       if (!line) return;
-      if (shouldRewrite) this.writeLine(line, block);
       this.classLine(line, block);
     }
-    if (shouldRewrite) this.selection.render();
+    if (shouldRewrite) inlineSelection.renderIn(this);
   }
   writeLine(line, block) {
     const fragment = new DocumentFragment();
@@ -1204,7 +1200,7 @@ var Editor = class {
     });
     this.view = new View(container);
     this.mlManager = new MultilineManager2(this.view);
-    this.title = "Untitled";
+    this.title = "";
   }
   load(content) {
     const parserContext = new ParserContext(
@@ -1219,11 +1215,12 @@ var Editor = class {
     const range = new LineRange(0, 0);
     this.mlManager.manage(fairfaxDocument, range);
     this.view.updateRange(range, fairfaxDocument.blocks, true);
-    this.title = fairfaxDocument.titlePage.get("Title") || "Untitled";
+    this.title = fairfaxDocument.titlePage.get("Title") || "";
   }
   getContent() {
     const range = new LineRange(0, this.container.childElementCount - 1);
     const content = this.view.getTextInRange(range);
+    this.updateEntire();
     return content;
   }
   handleInput(e) {
@@ -1272,6 +1269,7 @@ var Editor = class {
     const [firstLineStartClass, lastLineStartClass] = this.getBorderClasses(range);
     const fairfaxDocument = this.parser.parse(text, parserContext);
     this.mlManager.manage(fairfaxDocument, range);
+    this.handleTitleChange(fairfaxDocument.titlePage.get("Title"));
     const overlap = this.mlManager.multilinesOverlap(range);
     if (overlap) {
       this.updateRange(range.extend(overlap), true);
@@ -1283,6 +1281,10 @@ var Editor = class {
       this.updateNeighbors(context);
     }
   }
+  updateEntire() {
+    const range = new LineRange(0, this.container.childElementCount - 1);
+    this.updateRange(range);
+  }
   updateNeighbors(context) {
     if (context.nextLine) this.updateLine(context.nextLine);
     if (context.previousLine) this.updateLine(context.previousLine);
@@ -1292,7 +1294,15 @@ var Editor = class {
     const lastLine = this.view.getLineAt(range.end);
     return [firstLine?.className, lastLine?.className];
   }
+  handleTitleChange(newTitle) {
+    newTitle = newTitle ?? "";
+    if (this.title !== newTitle) {
+      this.title = newTitle;
+    }
+  }
 };
 export {
-  Editor
+  Editor,
+  InlineSelection,
+  View
 };
