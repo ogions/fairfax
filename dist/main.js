@@ -998,7 +998,6 @@ var MultilineManager2 = class {
     this.openMultilines.push(end);
   }
   close(start, end, index) {
-    console.log("Clsoing a multiline");
     this.openMultilines.splice(index, 1);
     const range = new MultilineRange(
       start.type,
@@ -1013,7 +1012,6 @@ var MultilineManager2 = class {
    */
   multilinesOverlap(range) {
     for (let multiline of this.activeMultilines) {
-      console.log(multiline.range.end);
       if (multiline.range.overlaps(range) && !range.includesRange(multiline.range)) return multiline.range;
     }
     return;
@@ -1192,6 +1190,10 @@ var View = class {
       if (shouldRewrite) this.writeLine(line, block);
       this.classLine(line, block);
     }
+    for (let i = range.end; i >= range.start + blocks.length; i--) {
+      const line = this.getLineAt(i);
+      if (line) line.remove();
+    }
     if (shouldRewrite) inlineSelection.renderIn(this);
   }
   writeLine(line, block) {
@@ -1299,9 +1301,7 @@ var Editor = class {
     }
   }
   updateRange(range, shouldRewrite) {
-    console.log("Updating range ", range);
     const text = this.view.getTextInRange(range);
-    console.log(text);
     const context = new RangeContext(range, this.view);
     if (context.nextLine && context.nextLine.tagName === "BR") {
       context.nextLine.remove();
@@ -1321,7 +1321,6 @@ var Editor = class {
     this.handleTitleChange(fairfaxDocument.titlePage.get("Title"));
     const overlap = this.mlManager.multilinesOverlap(range);
     if (overlap) {
-      console.log("Overlap detected");
       this.updateRange(range.extend(overlap), true);
       return;
     }

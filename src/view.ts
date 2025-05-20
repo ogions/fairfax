@@ -138,7 +138,8 @@ export class View {
 
             let lineIndex = i + range.start;
 
-            /* If the targeted index is outside the container altogether, we
+            /* 
+             * If the targeted index is outside the container altogether, we
              * add a new line to the end, then reset the index to that new last
              * line.
              *
@@ -150,7 +151,8 @@ export class View {
                 lineIndex = this.container.children.length;
                 this.insertLineAt(lineIndex);
             } else if (lineIndex > range.end) {
-                /* If the desired index is outside the targeted range (for example,
+                /* 
+                 * If the desired index is outside the targeted range (for example,
                  * if there are more blocks than there are lines in the range), we
                  * need to add new lines following the range to avoid overwriting
                  * other lines.
@@ -160,7 +162,8 @@ export class View {
 
             let line = this.getLineAt(lineIndex);
 
-            /* This is a safety guardrail and should never happen. The above
+            /* 
+             * This is a safety guardrail and should never happen. The above
              * cases handle too-high indexes. Too-low (less than 0) indexes
              * could still cause problems, but those should never be passed
              * into this function in the first place.
@@ -169,6 +172,15 @@ export class View {
 
             if (shouldRewrite) this.writeLine(line, block);
             this.classLine(line, block);
+        }
+        /*
+         * If the given range is larger than the number of blocks provided,
+         * delete the extra elements in the range. This is another guardrail
+         * that should never actually be needed.
+         */
+        for (let i = range.end; i >= range.start + blocks.length; i--) {
+            const line = this.getLineAt(i);
+            if (line) line.remove();
         }
         if (shouldRewrite) inlineSelection.renderIn(this);
     }
