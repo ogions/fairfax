@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <script src="main.js" type="module"></script>
+        <link rel="stylesheet" href="style.css" />
+        <link rel="shortcut icon" href="#" />
+        <script type="module" defer>
+            import { Editor } from "./main.js";
+            const container = document.getElementById("monica");
+            if (container) new Editor(container);
+        </script>
+    </head>
+    <body>
+        <main id="monica"></main>
+    </body>
+</html>
