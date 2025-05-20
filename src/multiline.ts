@@ -112,7 +112,6 @@ export class MultilineManager {
     }
 
     close(start: MultilineEnd, end: MultilineEnd, index: number) {
-        console.log("Clsoing a multiline");
         this.openMultilines.splice(index, 1);
         const range = new MultilineRange(
             start.type,
@@ -128,7 +127,6 @@ export class MultilineManager {
      */
     multilinesOverlap(range: LineRange): LineRange | undefined {
         for (let multiline of this.activeMultilines) {
-            console.log(multiline.range.end);
             if (
                 multiline.range.overlaps(range) &&
                 !range.includesRange(multiline.range)
