@@ -815,26 +815,61 @@ var Parser = class _Parser {
   }
   parseInlines(tokens) {
     const openInlines = [];
+    let previousToken;
     for (let token of tokens) {
-      if (!(token instanceof StyleToken)) continue;
+      if (!(token instanceof StyleToken)) {
+        previousToken = token;
+        continue;
+      }
       if (token.active) {
         if (token.type === 11 /* NoteOpen */) this.isInNote = true;
         if (token.type === 12 /* NoteClose */) this.isInNote = false;
       }
       if (this.isInNote) continue;
       if (token.type === 20 /* Bold */ || token.type === 19 /* Italic */ || token.type === 21 /* Underline */) {
+        let hasMatched = false;
         for (let i = openInlines.length - 1; i >= 0; i--) {
           const openInline = openInlines[i];
           if (token.type === openInline.type) {
-            openInline.active = true;
-            token.active = true;
-            openInlines.splice(i, 1);
-            break;
+            if (hasMatched) {
+              openInlines.splice(i, 1);
+            } else if (openInline !== previousToken) {
+              openInline.active = true;
+              token.active = true;
+              openInlines.splice(i, 1);
+              hasMatched = true;
+            }
           }
         }
         if (!token.active) openInlines.push(token);
       }
+      previousToken = token;
     }
+    let hasUnmatchedItalic = false;
+    let hasUnmatchedBold = false;
+    for (let token of openInlines) {
+      if (token.type === 19 /* Italic */) {
+        hasUnmatchedItalic = true;
+      }
+      if (token.type === 20 /* Bold */) {
+        hasUnmatchedBold = true;
+        tokens.splice(
+          tokens.indexOf(token),
+          1,
+          new StyleToken(
+            19 /* Italic */,
+            "*",
+            false
+          ),
+          new StyleToken(
+            19 /* Italic */,
+            "*",
+            false
+          )
+        );
+      }
+    }
+    if (hasUnmatchedItalic && hasUnmatchedBold) this.parseInlines(tokens);
   }
 };
 
@@ -963,6 +998,7 @@ var MultilineManager2 = class {
     this.openMultilines.push(end);
   }
   close(start, end, index) {
+    console.log("Clsoing a multiline");
     this.openMultilines.splice(index, 1);
     const range = new MultilineRange(
       start.type,
@@ -977,6 +1013,7 @@ var MultilineManager2 = class {
    */
   multilinesOverlap(range) {
     for (let multiline of this.activeMultilines) {
+      console.log(multiline.range.end);
       if (multiline.range.overlaps(range) && !range.includesRange(multiline.range)) return multiline.range;
     }
     return;
@@ -1152,6 +1189,7 @@ var View = class {
       }
       let line = this.getLineAt(lineIndex);
       if (!line) return;
+      if (shouldRewrite) this.writeLine(line, block);
       this.classLine(line, block);
     }
     if (shouldRewrite) inlineSelection.renderIn(this);
@@ -1178,8 +1216,7 @@ var View = class {
     if (line.textContent === "") line.innerHTML = "<br>";
   }
   classLine(line, block) {
-    const lineClass = this.blockMap.get(block.type) ?? "Action";
-    line.className = lineClass;
+    line.className = this.blockMap.get(block.type) ?? "Action";
     if (block.centered) {
       line.classList.add("Centered");
     }
@@ -1224,21 +1261,31 @@ var Editor = class {
     return content;
   }
   handleInput(e) {
+    if (e.inputType === "insertCompositionText") {
+      return;
+    }
     const activeLine = this.view.getActiveLine();
     if (!activeLine && this.container.querySelectorAll("div").length === 0) {
       this.view.resetContainer();
     }
     if (!activeLine) return;
-    if (e.inputType === "insertParagraph") {
+    if (e.inputType === "insertParagraph" || e.inputType === "insertFromPaste") {
       const lineIndex = this.view.getLineIndex(activeLine);
       if (lineIndex === void 0) return;
       const lineRange = new LineRange(lineIndex, lineIndex);
       const overlap = this.mlManager.multilinesOverlap(lineRange);
       if (overlap) {
-        const extendedRange = new LineRange(overlap.start, overlap.end + 1);
+        let lineOffset = 1;
+        const extendedRange = new LineRange(overlap.start, overlap.end + lineOffset);
         this.updateRange(lineRange.extend(extendedRange), true);
         return;
       }
+    }
+    if (e.inputType === "insertParagraph" || e.inputType === "deleteContentBackward" || e.inputType === "insertFromPaste" || e.inputType === "deleteByCut") {
+      const lineIndex = this.view.getLineIndex(activeLine);
+      if (lineIndex === void 0) return;
+      const lineRange = new LineRange(lineIndex - 1, lineIndex + 1);
+      this.updateRange(lineRange, true);
     }
     this.updateLine(activeLine, true);
   }
@@ -1252,7 +1299,9 @@ var Editor = class {
     }
   }
   updateRange(range, shouldRewrite) {
+    console.log("Updating range ", range);
     const text = this.view.getTextInRange(range);
+    console.log(text);
     const context = new RangeContext(range, this.view);
     if (context.nextLine && context.nextLine.tagName === "BR") {
       context.nextLine.remove();
@@ -1272,6 +1321,7 @@ var Editor = class {
     this.handleTitleChange(fairfaxDocument.titlePage.get("Title"));
     const overlap = this.mlManager.multilinesOverlap(range);
     if (overlap) {
+      console.log("Overlap detected");
       this.updateRange(range.extend(overlap), true);
       return;
     }

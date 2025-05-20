@@ -48,6 +48,11 @@ export class Editor {
     }
 
     handleInput(e: InputEvent) {
+        // Ignore composition events to avoid duplicating text
+        if (e.inputType === "insertCompositionText") {
+            return;
+        }
+
         const activeLine = this.view.getActiveLine();
 
         /* 
@@ -63,22 +68,45 @@ export class Editor {
             this.view.resetContainer();
         }
         if (!activeLine) return;
-        
+
         /* 
-         * If we added a line inside of an active multiline, then we should
-         * reparse the entire multiline range (with an adjusted end index to
-         * account for the new line).
+         * If we added a line (or pasted multiple) inside of an active
+         * multiline, then we should reparse the entire multiline range, with
+         * an adjusted end index to account for the new line(s).
+         *
+         * N.B. This needs to be checked before the next check. Otherwise, that
+         * update will mess up the multiline tracker because of an outdated
+         * range.
          */
-        if (e.inputType === "insertParagraph") {
+        if (e.inputType === "insertParagraph" || e.inputType === "insertFromPaste") {
             const lineIndex = this.view.getLineIndex(activeLine);
             if (lineIndex === undefined) return;
             const lineRange = new LineRange(lineIndex, lineIndex);
             const overlap = this.mlManager.multilinesOverlap(lineRange);
             if (overlap) {
-                const extendedRange = new LineRange(overlap.start, overlap.end + 1);
+                let lineOffset = 1;
+                const extendedRange = new LineRange(overlap.start, overlap.end + lineOffset);
                 this.updateRange(lineRange.extend(extendedRange), true);
                 return;
             }
+        }
+
+        /*
+         * If we might have inserted or deleted a paragraph, make sure that we
+         * reparse the surrounding lines to handle any side effects.
+         *
+         * TODO: Discriminate more.
+         */
+        if (
+            e.inputType === "insertParagraph" ||
+            e.inputType === "deleteContentBackward" ||
+            e.inputType === "insertFromPaste" ||
+            e.inputType === "deleteByCut"
+        ) {
+            const lineIndex = this.view.getLineIndex(activeLine);
+            if (lineIndex === undefined) return;
+            const lineRange = new LineRange(lineIndex - 1, lineIndex + 1);
+            this.updateRange(lineRange, true);
         }
 
         this.updateLine(activeLine, true);
@@ -105,7 +133,7 @@ export class Editor {
     }
 
     updateRange(range: LineRange, shouldRewrite?: boolean) {
-        
+
         const text = this.view.getTextInRange(range);
         const context = new RangeContext(range, this.view);
         
