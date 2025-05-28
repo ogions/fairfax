@@ -1204,7 +1204,6 @@ var View = class {
       } else {
         const span = document.createElement("span");
         span.textContent = run.text;
-        console.log(run.styles);
         for (let style of run.styles) {
           const runClass = this.styleMap.get(style);
           if (typeof runClass === "string") {
