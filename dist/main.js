@@ -978,6 +978,9 @@ var MultilineManager2 = class {
       );
       this.tryClosing(end);
     }
+    for (let multiline of this.activeMultilines) {
+      console.log(multiline.range);
+    }
   }
   tryClosing(end) {
     if (end.forward) {
@@ -1237,6 +1240,7 @@ var Editor = class {
     this.container.addEventListener("input", (e) => {
       this.handleInput(e);
     });
+    this.lineCount = 0;
     this.view = new View(container);
     this.mlManager = new MultilineManager2(this.view);
     this.title = "";
@@ -1267,27 +1271,23 @@ var Editor = class {
       return;
     }
     const activeLine = this.view.getActiveLine();
-    if (!activeLine && this.container.querySelectorAll("div").length === 0) {
-      this.view.resetContainer();
-    }
-    if (!activeLine) return;
-    if (e.inputType === "insertParagraph" || e.inputType === "insertFromPaste") {
-      const lineIndex = this.view.getLineIndex(activeLine);
-      if (lineIndex === void 0) return;
-      const lineRange = new LineRange(lineIndex, lineIndex);
-      const overlap = this.mlManager.multilinesOverlap(lineRange);
-      if (overlap) {
-        let lineOffset = 1;
-        const extendedRange = new LineRange(overlap.start, overlap.end + lineOffset);
-        this.updateRange(lineRange.extend(extendedRange), true);
-        return;
+    if (!activeLine) {
+      if (e.inputType === "deleteByCut") {
+        const selection = document.getSelection();
+        if (selection && selection.anchorNode === this.container) {
+          const textNode = this.container.childNodes[selection.anchorOffset];
+          if (textNode && textNode.nodeName === "BR") {
+            const newLine = document.createElement("div");
+            newLine.innerHTML = "<br>";
+            this.container.replaceChild(newLine, textNode);
+            selection.setPosition(newLine);
+            this.updateLine(newLine, true);
+          }
+        }
+      } else if (this.container.querySelectorAll("div").length === 0) {
+        this.view.resetContainer();
       }
-    }
-    if (e.inputType === "insertParagraph" || e.inputType === "deleteContentBackward" || e.inputType === "insertFromPaste" || e.inputType === "deleteByCut") {
-      const lineIndex = this.view.getLineIndex(activeLine);
-      if (lineIndex === void 0) return;
-      const lineRange = new LineRange(lineIndex - 1, lineIndex + 1);
-      this.updateRange(lineRange, true);
+      return;
     }
     this.updateLine(activeLine, true);
   }
@@ -1325,6 +1325,11 @@ var Editor = class {
       return;
     }
     this.view.updateRange(range, fairfaxDocument.blocks, shouldRewrite ?? false);
+    const difference = this.container.childElementCount - this.lineCount;
+    console.log(`Line count changed by ${difference}`);
+    if (difference !== 0) {
+    }
+    this.lineCount = this.container.childElementCount;
     const [firstLineEndClass, lastLineEndClass] = this.getBorderClasses(range);
     if (firstLineStartClass != firstLineEndClass || lastLineStartClass != lastLineEndClass) {
       this.updateNeighbors(context);

@@ -5,6 +5,7 @@ import { View } from "./view";
 
 export class Editor {
     container: HTMLElement;
+    lineCount: number;
     mlManager: MultilineManager;
     parser = new Parser();
     view: View;
@@ -17,6 +18,7 @@ export class Editor {
             this.handleInput(e as InputEvent)
         });
 
+        this.lineCount = 0;
         this.view = new View(container);
         this.mlManager = new MultilineManager(this.view);
         this.title = "";
@@ -55,19 +57,34 @@ export class Editor {
 
         const activeLine = this.view.getActiveLine();
 
-        /* 
-         * If there are no more child lines in the main container, then we
-         * need to reset the container to have one empty line element.
-         * This prevents the document from becoming malformed.
-         *
-         * I don't think there are other reasons the active line would be
-         * undefined, but just in case, we have a second check to avoid
-         * clearing the whole document. Either way, we ignore the input.
-         */
-        if (!activeLine && this.container.querySelectorAll("div").length === 0) {
-            this.view.resetContainer();
+        if (!activeLine) {
+            if (e.inputType === "deleteByCut") {
+                /*
+                 * Sometimes, a cut (i.e. via CTRL+X) will delete the active
+                 * line element and replace it with an empty text node. We'll
+                 * surround that text node with a blank line if that's the case.
+                 */
+                const selection = document.getSelection();
+                if (selection && selection.anchorNode === this.container) {
+                    const textNode = this.container.childNodes[selection.anchorOffset];
+                    if (textNode && textNode.nodeName === "BR") {
+                        const newLine = document.createElement("div");
+                        newLine.innerHTML = "<br>";
+                        this.container.replaceChild(newLine, textNode);
+                        selection.setPosition(newLine);
+                        this.updateLine(newLine, true);
+                    }
+                }
+            } else if (this.container.querySelectorAll("div").length === 0) {
+                /* 
+                 * If there are no more child lines in the main container, then
+                 * we need to reset the container to have one empty line
+                 * element. This prevents the document from becoming malformed.
+                 */
+                this.view.resetContainer();
+            }
+            return;
         }
-        if (!activeLine) return;
 
         /* 
          * If we added a line (or pasted multiple) inside of an active
@@ -77,7 +94,6 @@ export class Editor {
          * N.B. This needs to be checked before the next check. Otherwise, that
          * update will mess up the multiline tracker because of an outdated
          * range.
-         */
         if (e.inputType === "insertParagraph" || e.inputType === "insertFromPaste") {
             const lineIndex = this.view.getLineIndex(activeLine);
             if (lineIndex === undefined) return;
@@ -90,13 +106,13 @@ export class Editor {
                 return;
             }
         }
+         */
 
         /*
          * If we might have inserted or deleted a paragraph, make sure that we
          * reparse the surrounding lines to handle any side effects.
          *
          * TODO: Discriminate more.
-         */
         if (
             e.inputType === "insertParagraph" ||
             e.inputType === "deleteContentBackward" ||
@@ -108,6 +124,7 @@ export class Editor {
             const lineRange = new LineRange(lineIndex - 1, lineIndex + 1);
             this.updateRange(lineRange, true);
         }
+         */
 
         this.updateLine(activeLine, true);
 
@@ -165,7 +182,7 @@ export class Editor {
         const fairfaxDocument = this.parser.parse(text, parserContext);
         this.mlManager.manage(fairfaxDocument, range);
         this.handleTitleChange(fairfaxDocument.titlePage.get("Title"));
-        
+
         /* 
          * If this range overlaps with any active multiline ranges, then we
          * should combine that range with this one and parse the whole thing.
@@ -177,6 +194,13 @@ export class Editor {
         }
 
         this.view.updateRange(range, fairfaxDocument.blocks, shouldRewrite ?? false);
+
+        const difference = this.container.childElementCount - this.lineCount;
+        console.log(`Line count changed by ${difference}`)
+        if (difference !== 0) {
+        }
+        
+        this.lineCount = this.container.childElementCount;
 
         /* 
          * Collect the updated class names. If they changed as a result of

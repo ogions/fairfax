@@ -72,6 +72,10 @@ export class MultilineManager {
             );
             this.tryClosing(end);
         }
+
+        for (let multiline of this.activeMultilines) {
+            console.log(multiline.range);
+        }
     }
 
     tryClosing(end: MultilineEnd) {
