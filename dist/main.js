@@ -603,7 +603,7 @@ var Stylizer = class _Stylizer {
       }
     }
     if (token.type === 0 /* SceneHeadingForce */ || token.type === 2 /* SceneNumberFence */ || token.type === 3 /* ActionForce */ || token.type === 4 /* CharacterForce */ || token.type === 5 /* DualDialogue */ || token.type === 6 /* LyricLeader */ || token.type === 7 /* TransitionForce */ || token.type === 15 /* SectionHeadingLeader */ || token.type === 16 /* SynopsisLeader */) {
-      return /* @__PURE__ */ new Set([6 /* Special */]);
+      return /* @__PURE__ */ new Set([6 /* Markup */]);
     }
     if (token.type === 1 /* SceneNumber */) {
       return /* @__PURE__ */ new Set([5 /* SceneNumber */]);
@@ -620,11 +620,11 @@ var Stylizer = class _Stylizer {
       if (this.activeStyles.has(style)) {
         this.activeStyles.delete(style);
         styles.delete(style);
-        styles.add(6 /* Special */);
+        styles.add(6 /* Markup */);
       } else {
         if (!(this.isInlineStyle(style) && !allowInlineStyles)) {
           this.activeStyles.add(style);
-          styles.add(6 /* Special */);
+          styles.add(6 /* Markup */);
         }
       }
     }
@@ -755,7 +755,7 @@ var Parser = class _Parser {
         }
         const text = token.content;
         const styles = this.stylizer.stylize(token);
-        if (!(styles.has(3 /* Boneyard */) || styles.has(4 /* Note */) || styles.has(6 /* Special */))) {
+        if (!(styles.has(3 /* Boneyard */) || styles.has(4 /* Note */) || styles.has(6 /* Markup */))) {
           styles.add(8 /* TitlePageValue */);
         }
         runs.push(new Run(text, styles));
@@ -1097,7 +1097,7 @@ var View = class {
       [3 /* Boneyard */, "Boneyard"],
       [4 /* Note */, "Note"],
       [5 /* SceneNumber */, "SceneNumber"],
-      [6 /* Special */, "Special"],
+      [6 /* Markup */, "Markup"],
       [7 /* TitlePageKey */, "TitlePageKey"],
       [8 /* TitlePageValue */, "TitlePageValue"]
     ]);
@@ -1204,6 +1204,7 @@ var View = class {
       } else {
         const span = document.createElement("span");
         span.textContent = run.text;
+        console.log(run.styles);
         for (let style of run.styles) {
           const runClass = this.styleMap.get(style);
           if (typeof runClass === "string") {
