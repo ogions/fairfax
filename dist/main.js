@@ -978,9 +978,6 @@ var MultilineManager2 = class {
       );
       this.tryClosing(end);
     }
-    for (let multiline of this.activeMultilines) {
-      console.log(multiline.range);
-    }
   }
   tryClosing(end) {
     if (end.forward) {
@@ -1007,6 +1004,17 @@ var MultilineManager2 = class {
       new LineRange(start.index, end.index)
     );
     this.activeMultilines.add(range);
+  }
+  updateAfter(range, difference) {
+    for (let multiline of this.activeMultilines) {
+      if (multiline.range.start >= range.start) {
+        multiline.range.start += difference;
+        multiline.range.end += difference;
+      } else if (multiline.range.end >= range.start) {
+        multiline.range.end += difference;
+      }
+      console.log(multiline.range);
+    }
   }
   /* 
    * Check if the given range overlaps with any active multiline ranges. Note
@@ -1319,17 +1327,17 @@ var Editor = class {
     const fairfaxDocument = this.parser.parse(text, parserContext);
     this.mlManager.manage(fairfaxDocument, range);
     this.handleTitleChange(fairfaxDocument.titlePage.get("Title"));
+    this.view.updateRange(range, fairfaxDocument.blocks, shouldRewrite ?? false);
+    const difference = this.container.childElementCount - this.lineCount;
+    this.lineCount = this.container.childElementCount;
+    if (difference !== 0) {
+      this.mlManager.updateAfter(range, difference);
+    }
     const overlap = this.mlManager.multilinesOverlap(range);
     if (overlap) {
       this.updateRange(range.extend(overlap), true);
       return;
     }
-    this.view.updateRange(range, fairfaxDocument.blocks, shouldRewrite ?? false);
-    const difference = this.container.childElementCount - this.lineCount;
-    console.log(`Line count changed by ${difference}`);
-    if (difference !== 0) {
-    }
-    this.lineCount = this.container.childElementCount;
     const [firstLineEndClass, lastLineEndClass] = this.getBorderClasses(range);
     if (firstLineStartClass != firstLineEndClass || lastLineStartClass != lastLineEndClass) {
       this.updateNeighbors(context);

@@ -86,46 +86,6 @@ export class Editor {
             return;
         }
 
-        /* 
-         * If we added a line (or pasted multiple) inside of an active
-         * multiline, then we should reparse the entire multiline range, with
-         * an adjusted end index to account for the new line(s).
-         *
-         * N.B. This needs to be checked before the next check. Otherwise, that
-         * update will mess up the multiline tracker because of an outdated
-         * range.
-        if (e.inputType === "insertParagraph" || e.inputType === "insertFromPaste") {
-            const lineIndex = this.view.getLineIndex(activeLine);
-            if (lineIndex === undefined) return;
-            const lineRange = new LineRange(lineIndex, lineIndex);
-            const overlap = this.mlManager.multilinesOverlap(lineRange);
-            if (overlap) {
-                let lineOffset = 1;
-                const extendedRange = new LineRange(overlap.start, overlap.end + lineOffset);
-                this.updateRange(lineRange.extend(extendedRange), true);
-                return;
-            }
-        }
-         */
-
-        /*
-         * If we might have inserted or deleted a paragraph, make sure that we
-         * reparse the surrounding lines to handle any side effects.
-         *
-         * TODO: Discriminate more.
-        if (
-            e.inputType === "insertParagraph" ||
-            e.inputType === "deleteContentBackward" ||
-            e.inputType === "insertFromPaste" ||
-            e.inputType === "deleteByCut"
-        ) {
-            const lineIndex = this.view.getLineIndex(activeLine);
-            if (lineIndex === undefined) return;
-            const lineRange = new LineRange(lineIndex - 1, lineIndex + 1);
-            this.updateRange(lineRange, true);
-        }
-         */
-
         this.updateLine(activeLine, true);
 
     }
@@ -183,6 +143,19 @@ export class Editor {
         this.mlManager.manage(fairfaxDocument, range);
         this.handleTitleChange(fairfaxDocument.titlePage.get("Title"));
 
+        this.view.updateRange(range, fairfaxDocument.blocks, shouldRewrite ?? false);
+
+        /*
+         * If we've changed the number of lines in any way (adding, deleting,
+         * cutting, pasting, etc.), then we need to update all of the multiline
+         * structures that follow the altered range to reflect that.
+         */
+        const difference = this.container.childElementCount - this.lineCount;
+        this.lineCount = this.container.childElementCount;
+        if (difference !== 0) {
+            this.mlManager.updateAfter(range, difference);
+        }
+
         /* 
          * If this range overlaps with any active multiline ranges, then we
          * should combine that range with this one and parse the whole thing.
@@ -192,15 +165,6 @@ export class Editor {
             this.updateRange(range.extend(overlap), true);
             return;
         }
-
-        this.view.updateRange(range, fairfaxDocument.blocks, shouldRewrite ?? false);
-
-        const difference = this.container.childElementCount - this.lineCount;
-        console.log(`Line count changed by ${difference}`)
-        if (difference !== 0) {
-        }
-        
-        this.lineCount = this.container.childElementCount;
 
         /* 
          * Collect the updated class names. If they changed as a result of

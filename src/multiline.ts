@@ -72,10 +72,6 @@ export class MultilineManager {
             );
             this.tryClosing(end);
         }
-
-        for (let multiline of this.activeMultilines) {
-            console.log(multiline.range);
-        }
     }
 
     tryClosing(end: MultilineEnd) {
@@ -122,6 +118,21 @@ export class MultilineManager {
             new LineRange(start.index, end.index)
         );
         this.activeMultilines.add(range);
+    }
+
+    /*
+     * Update any multiline structures at or following a given range with the
+     * given change in line count.
+     */
+    updateAfter(range: LineRange, difference: number) {
+        for (let multiline of this.activeMultilines) {
+            if (multiline.range.end >= range.start) {
+                multiline.range.end += difference;
+                if (multiline.range.start >= range.start) {
+                    multiline.range.start += difference;
+                }
+            }
+        }
     }
 
     /* 
