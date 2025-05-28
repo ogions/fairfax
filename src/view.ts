@@ -26,7 +26,7 @@ export class View {
         [RunStyle.Boneyard, "Boneyard"],
         [RunStyle.Note, "Note"],
         [RunStyle.SceneNumber, "SceneNumber"],
-        [RunStyle.Special, "Special"],
+        [RunStyle.Markup, "Markup"],
         [RunStyle.TitlePageKey, "TitlePageKey"],
         [RunStyle.TitlePageValue, "TitlePageValue"]
     ]);
