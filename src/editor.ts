@@ -62,7 +62,7 @@ export class Editor {
                 /*
                  * Sometimes, a cut (i.e. via CTRL+X) will delete the active
                  * line element and replace it with an empty text node. We'll
-                 * surround that text node with a blank line if that's the case.
+                 * replace that text node with a blank line if that's the case.
                  */
                 const selection = document.getSelection();
                 if (selection && selection.anchorNode === this.container) {
