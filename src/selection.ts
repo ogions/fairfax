@@ -49,8 +49,7 @@ export class InlineSelection {
         );
     }
 
-    renderIn(view: View) {
-        const activeLine = view.getActiveLine() ?? view.container;
+    renderIn(activeLine: HTMLElement) {
         const selection = document.getSelection();
         if (!selection) return;
 

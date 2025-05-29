@@ -125,31 +125,34 @@ export class View {
         return lineText;
     }
 
-    updateRange(range: LineRange, blocks: Block[], shouldRewrite: boolean) {
+    updateRange(range: LineRange, blocks: Block[], shouldRewrite: boolean, pasteOffset?: number) {
 
         // This is fragile, need to fix
         const selection = document.getSelection();
         if (!selection) return;
         const anchor = selection.anchorNode;
         if (!anchor) return;
+        const activeLine = this.getLineElementFrom(anchor);
         const offset = selection.anchorOffset;
         const inlineSelection = new InlineSelection(this, anchor, offset);
         for (let [i, block] of blocks.entries()) {
 
             let lineIndex = i + range.start;
+            let shouldReplaceSelection = false;
 
             /* 
              * If the targeted index is outside the container altogether, we
              * add a new line to the end, then reset the index to that new last
              * line.
              *
-             * NOTE: It's safe to insert at an index greater than the container
+             * It's safe to insert at an index greater than the container
              * length. The insertLineAt() method just appends a child to the
              * end of the container if that's the case.
              */
             if (lineIndex >= this.container.children.length) {
                 lineIndex = this.container.children.length;
                 this.insertLineAt(lineIndex);
+                shouldReplaceSelection = true;
             } else if (lineIndex > range.end) {
                 /* 
                  * If the desired index is outside the targeted range (for example,
@@ -158,6 +161,7 @@ export class View {
                  * other lines.
                  */
                 this.insertLineAt(lineIndex);
+                shouldReplaceSelection = true;
             }
 
             let line = this.getLineAt(lineIndex);
@@ -170,7 +174,23 @@ export class View {
              */
             if (!line) return;
 
-            if (shouldRewrite) this.writeLine(line, block);
+            if (shouldRewrite) {
+                this.writeLine(line, block);
+
+                /*
+                 * In the case of a multiline insertion, the selection should be
+                 * moved to the end of the added content. As far as I can tell,
+                 * this can only happen via paste.
+                 */
+                if (shouldReplaceSelection && pasteOffset !== undefined) {
+                    inlineSelection.offset = pasteOffset;
+                    inlineSelection.renderIn(line);
+                } else {
+                    if (activeLine && line === activeLine) {
+                        inlineSelection.renderIn(activeLine);
+                    }
+                };
+            }
             this.classLine(line, block);
         }
         /*
@@ -182,7 +202,6 @@ export class View {
             const line = this.getLineAt(i);
             if (line) line.remove();
         }
-        if (shouldRewrite) inlineSelection.renderIn(this);
     }
 
     writeLine(line: HTMLElement, block: Block) {

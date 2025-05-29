@@ -86,11 +86,17 @@ export class Editor {
             return;
         }
 
-        this.updateLine(activeLine, true);
-
+        if (e.inputType === "insertFromPaste") {
+            const selection = document.getSelection();
+            if (selection) {
+                this.updateLine(activeLine, true, selection.anchorOffset);
+            }
+        } else {
+            this.updateLine(activeLine, true);
+        }
     }
 
-    updateLine(line: HTMLElement, shouldRewrite?: boolean) {
+    updateLine(line: HTMLElement, shouldRewrite?: boolean, pasteOffset?: number) {
 
         /* 
          * If this is a character element with the dual dialogue flag, we need
@@ -105,11 +111,11 @@ export class Editor {
 
         const lineIndex = this.view.getLineIndex(line);
         if (lineIndex !== undefined) {
-            this.updateRange(new LineRange(lineIndex, lineIndex), shouldRewrite)
+            this.updateRange(new LineRange(lineIndex, lineIndex), shouldRewrite, pasteOffset)
         }
     }
 
-    updateRange(range: LineRange, shouldRewrite?: boolean) {
+    updateRange(range: LineRange, shouldRewrite?: boolean, pasteOffset?: number) {
 
         const text = this.view.getTextInRange(range);
         const context = new RangeContext(range, this.view);
@@ -121,7 +127,7 @@ export class Editor {
          */
         if (context.nextLine && context.nextLine.tagName === "BR") {
             context.nextLine.remove();
-            this.updateRange(range, shouldRewrite);
+            this.updateRange(range, shouldRewrite, pasteOffset);
             return;
         }
 
@@ -143,12 +149,12 @@ export class Editor {
         this.mlManager.manage(fairfaxDocument, range);
         this.handleTitleChange(fairfaxDocument.titlePage.get("Title"));
 
-        this.view.updateRange(range, fairfaxDocument.blocks, shouldRewrite ?? false);
+        this.view.updateRange(range, fairfaxDocument.blocks, shouldRewrite ?? false, pasteOffset);
 
         /*
          * If we've changed the number of lines in any way (adding, deleting,
          * cutting, pasting, etc.), then we need to update all of the multiline
-         * structures that follow the altered range to reflect that.
+         * structures that follow the altered range to reflect that. 
          */
         const difference = this.container.childElementCount - this.lineCount;
         this.lineCount = this.container.childElementCount;
@@ -161,14 +167,15 @@ export class Editor {
          * should combine that range with this one and parse the whole thing.
          */
         const overlap = this.mlManager.multilinesOverlap(range);
-        if (overlap) {
+        if (overlap && shouldRewrite) {
             this.updateRange(range.extend(overlap), true);
             return;
         }
 
         /* 
          * Collect the updated class names. If they changed as a result of
-         * parsing, then we should update the neighboring lines as well.
+         * parsing, or if we added or removed a line, then we reparse the
+         * surrounding lines as well.
          *
          * This is a form of indirect recursion and technically has the
          * potential for overflow. However, there are no Fountain elements I
@@ -177,7 +184,8 @@ export class Editor {
         const [firstLineEndClass, lastLineEndClass] = this.getBorderClasses(range);
         if (
             firstLineStartClass != firstLineEndClass ||
-            lastLineStartClass != lastLineEndClass
+            lastLineStartClass != lastLineEndClass ||
+            difference != 0
         ) {
             this.updateNeighbors(context);
         }

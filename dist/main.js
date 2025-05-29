@@ -1005,15 +1005,18 @@ var MultilineManager2 = class {
     );
     this.activeMultilines.add(range);
   }
+  /*
+   * Update any multiline structures at or following a given range with the
+   * given change in line count.
+   */
   updateAfter(range, difference) {
     for (let multiline of this.activeMultilines) {
-      if (multiline.range.start >= range.start) {
-        multiline.range.start += difference;
+      if (multiline.range.end >= range.start) {
         multiline.range.end += difference;
-      } else if (multiline.range.end >= range.start) {
-        multiline.range.end += difference;
+        if (multiline.range.start >= range.start) {
+          multiline.range.start += difference;
+        }
       }
-      console.log(multiline.range);
     }
   }
   /* 
@@ -1059,8 +1062,7 @@ var InlineSelection = class {
       0
     );
   }
-  renderIn(view) {
-    const activeLine = view.getActiveLine() ?? view.container;
+  renderIn(activeLine) {
     const selection = document.getSelection();
     if (!selection) return;
     if (this.offset === 0) {
@@ -1181,31 +1183,48 @@ var View = class {
     }
     return lineText;
   }
-  updateRange(range, blocks, shouldRewrite) {
+  updateRange(range, blocks, shouldRewrite, pasteOffset) {
     const selection = document.getSelection();
     if (!selection) return;
     const anchor = selection.anchorNode;
     if (!anchor) return;
+    const activeLine = this.getLineElementFrom(anchor);
     const offset = selection.anchorOffset;
     const inlineSelection = new InlineSelection(this, anchor, offset);
     for (let [i, block] of blocks.entries()) {
       let lineIndex = i + range.start;
+      let shouldReplaceSelection = false;
       if (lineIndex >= this.container.children.length) {
         lineIndex = this.container.children.length;
         this.insertLineAt(lineIndex);
+        shouldReplaceSelection = true;
       } else if (lineIndex > range.end) {
         this.insertLineAt(lineIndex);
+        shouldReplaceSelection = true;
       }
       let line = this.getLineAt(lineIndex);
       if (!line) return;
-      if (shouldRewrite) this.writeLine(line, block);
+      if (shouldRewrite) {
+        this.writeLine(line, block);
+        if (shouldReplaceSelection) {
+          console.log("replacing selection with offset ", pasteOffset);
+          if (pasteOffset !== void 0) {
+            inlineSelection.offset = pasteOffset;
+            inlineSelection.renderIn(line);
+          }
+        } else {
+          if (activeLine && line === activeLine) {
+            inlineSelection.renderIn(activeLine);
+          }
+        }
+        ;
+      }
       this.classLine(line, block);
     }
     for (let i = range.end; i >= range.start + blocks.length; i--) {
       const line = this.getLineAt(i);
       if (line) line.remove();
     }
-    if (shouldRewrite) inlineSelection.renderIn(this);
   }
   writeLine(line, block) {
     const fragment = new DocumentFragment();
@@ -1297,23 +1316,30 @@ var Editor = class {
       }
       return;
     }
-    this.updateLine(activeLine, true);
+    if (e.inputType === "insertFromPaste") {
+      const selection = document.getSelection();
+      if (selection) {
+        this.updateLine(activeLine, true, selection.anchorOffset);
+      }
+    } else {
+      this.updateLine(activeLine, true);
+    }
   }
-  updateLine(line, shouldRewrite) {
+  updateLine(line, shouldRewrite, pasteOffset) {
     if (line.classList.contains("Dual") && line.classList.contains("Character")) {
       shouldRewrite = true;
     }
     const lineIndex = this.view.getLineIndex(line);
     if (lineIndex !== void 0) {
-      this.updateRange(new LineRange(lineIndex, lineIndex), shouldRewrite);
+      this.updateRange(new LineRange(lineIndex, lineIndex), shouldRewrite, pasteOffset);
     }
   }
-  updateRange(range, shouldRewrite) {
+  updateRange(range, shouldRewrite, pasteOffset) {
     const text = this.view.getTextInRange(range);
     const context = new RangeContext(range, this.view);
     if (context.nextLine && context.nextLine.tagName === "BR") {
       context.nextLine.remove();
-      this.updateRange(range, shouldRewrite);
+      this.updateRange(range, shouldRewrite, pasteOffset);
       return;
     }
     const parserContext = new ParserContext(
@@ -1327,19 +1353,19 @@ var Editor = class {
     const fairfaxDocument = this.parser.parse(text, parserContext);
     this.mlManager.manage(fairfaxDocument, range);
     this.handleTitleChange(fairfaxDocument.titlePage.get("Title"));
-    this.view.updateRange(range, fairfaxDocument.blocks, shouldRewrite ?? false);
+    this.view.updateRange(range, fairfaxDocument.blocks, shouldRewrite ?? false, pasteOffset);
     const difference = this.container.childElementCount - this.lineCount;
     this.lineCount = this.container.childElementCount;
     if (difference !== 0) {
       this.mlManager.updateAfter(range, difference);
     }
     const overlap = this.mlManager.multilinesOverlap(range);
-    if (overlap) {
+    if (overlap && shouldRewrite) {
       this.updateRange(range.extend(overlap), true);
       return;
     }
     const [firstLineEndClass, lastLineEndClass] = this.getBorderClasses(range);
-    if (firstLineStartClass != firstLineEndClass || lastLineStartClass != lastLineEndClass) {
+    if (firstLineStartClass != firstLineEndClass || lastLineStartClass != lastLineEndClass || difference != 0) {
       this.updateNeighbors(context);
     }
   }
