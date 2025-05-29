@@ -567,12 +567,18 @@ var MultilineManager = class _MultilineManager {
   openTitlePage() {
     this.hasOpenTitlePage = true;
   }
+  /*
+   * We close the title page at an index one greater than the blank line that
+   * actually closes it. This keeps the title page responsive if anything
+   * moves backwards into that blank line. The only performance cost is a 
+   * reparse of the title page when editing the first non-title page line.
+   */
   closeTitlePage(index) {
     this.hasOpenTitlePage = false;
     this.activeMultilines.add(new MultilineStructure(
       2 /* TitlePage */,
       0,
-      index
+      index + 1
     ));
   }
 };
@@ -1009,11 +1015,11 @@ var MultilineManager2 = class {
    * Update any multiline structures at or following a given range with the
    * given change in line count.
    */
-  updateAfter(range, difference) {
+  updateAfter(index, difference) {
     for (let multiline of this.activeMultilines) {
-      if (multiline.range.end >= range.start) {
+      if (multiline.range.end >= index) {
         multiline.range.end += difference;
-        if (multiline.range.start >= range.start) {
+        if (multiline.range.start > index) {
           multiline.range.start += difference;
         }
       }
@@ -1206,12 +1212,9 @@ var View = class {
       if (!line) return;
       if (shouldRewrite) {
         this.writeLine(line, block);
-        if (shouldReplaceSelection) {
-          console.log("replacing selection with offset ", pasteOffset);
-          if (pasteOffset !== void 0) {
-            inlineSelection.offset = pasteOffset;
-            inlineSelection.renderIn(line);
-          }
+        if (shouldReplaceSelection && pasteOffset !== void 0) {
+          inlineSelection.offset = pasteOffset;
+          inlineSelection.renderIn(line);
         } else {
           if (activeLine && line === activeLine) {
             inlineSelection.renderIn(activeLine);
@@ -1357,7 +1360,8 @@ var Editor = class {
     const difference = this.container.childElementCount - this.lineCount;
     this.lineCount = this.container.childElementCount;
     if (difference !== 0) {
-      this.mlManager.updateAfter(range, difference);
+      const updateStart = difference > 0 ? range.start - difference : range.start;
+      this.mlManager.updateAfter(updateStart, difference);
     }
     const overlap = this.mlManager.multilinesOverlap(range);
     if (overlap && shouldRewrite) {

@@ -124,11 +124,11 @@ export class MultilineManager {
      * Update any multiline structures at or following a given range with the
      * given change in line count.
      */
-    updateAfter(range: LineRange, difference: number) {
+    updateAfter(index: number, difference: number) {
         for (let multiline of this.activeMultilines) {
-            if (multiline.range.end >= range.start) {
+            if (multiline.range.end >= index) {
                 multiline.range.end += difference;
-                if (multiline.range.start >= range.start) {
+                if (multiline.range.start > index) {
                     multiline.range.start += difference;
                 }
             }

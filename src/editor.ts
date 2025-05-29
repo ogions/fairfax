@@ -159,7 +159,8 @@ export class Editor {
         const difference = this.container.childElementCount - this.lineCount;
         this.lineCount = this.container.childElementCount;
         if (difference !== 0) {
-            this.mlManager.updateAfter(range, difference);
+            const updateStart = difference > 0 ? range.start - difference : range.start;
+            this.mlManager.updateAfter(updateStart, difference);
         }
 
         /* 
