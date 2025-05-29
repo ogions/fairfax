@@ -66,7 +66,7 @@ var FountainRegexes = class {
     this.sceneNumber = /#([^#]+)#\s*$/;
     this.sectionHeading = /^(#{1,6})/;
     this.titlePageKey = /^([^\s:][^:]*)(:\s*)(.*)$/;
-    this.titlePageIndentedValue = /^( {3}\s*|\t\s*)(.*)/;
+    this.titlePageIndentedValue = /^([ \u00A0]{3}\s*|\t\s*)(.*)/;
     this.transition = /^([^a-z]*TO:|FADE OUT.|CUT TO BLACK.|FADE TO BLACK.)$/;
   }
 };
@@ -932,6 +932,170 @@ var LineRange = class _LineRange {
     return new _LineRange(start, end);
   }
 };
+var Position = class {
+  constructor(view, node, offset) {
+    this.line = 0;
+    this.char = 0;
+    const line = view.getLineElementFrom(node);
+    if (!line) return;
+    const lineIndex = view.getLineIndex(line);
+    if (lineIndex === void 0) return;
+    this.line = lineIndex;
+    if (node.parentElement?.tagName === "SPAN") {
+      node = node.parentElement;
+    }
+    const childNodes = Array.from(line.childNodes);
+    if (node.nodeName === "DIV") {
+      this.char = this.sumNodeLengths(
+        childNodes,
+        0,
+        offset
+      );
+      return;
+    }
+    this.char = this.sumNodeLengths(
+      childNodes,
+      0,
+      childNodes.indexOf(node)
+    ) + offset;
+  }
+  sumNodeLengths(nodes, start, end) {
+    return nodes.slice(start, end).reduce(
+      (sum, node) => node.textContent ? sum + node.textContent.length : sum,
+      0
+    );
+  }
+};
+var PositionRange = class {
+  constructor(a, b) {
+    if (a.line < b.line || a.line === b.line && a.char <= b.char) {
+      this.start = a;
+      this.end = b;
+    } else {
+      this.start = b;
+      this.end = a;
+    }
+  }
+};
+
+// src/history.ts
+var Step = class {
+  constructor(range, type, oldText, newText) {
+    this.range = range;
+    this.type = type;
+    this.oldText = oldText;
+    this.newText = newText;
+  }
+};
+var EditorHistory = class {
+  constructor(editor) {
+    this.steps = [];
+    this.undoneSteps = [];
+    this.editor = editor;
+    editor.container.addEventListener("beforeinput", (e) => {
+      this.handleInput(e);
+    });
+    editor.container.addEventListener("keydown", (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "z") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          this.redo();
+        } else {
+          this.undo();
+        }
+      }
+    });
+  }
+  handleInput(e) {
+    const type = e.inputType.includes("insert") ? 0 /* Insertion */ : 1 /* Deletion */;
+    const selection = document.getSelection();
+    if (!selection) return;
+    const targetRange = this.getTargetRangeOf(e);
+    if (!targetRange) return;
+    selection.removeAllRanges();
+    selection.addRange(targetRange);
+    const oldText = selection.toString();
+    const newText = e.data ?? (e.inputType === "insertParagraph" ? "\n" : e.dataTransfer?.getData("text") ?? "");
+    const range = this.positionRangeFrom(targetRange, newText);
+    console.log(range, type, oldText, newText);
+    this.steps.push(new Step(range, type, oldText, newText));
+    if (this.steps.length > 99) {
+      this.steps.shift();
+    }
+    this.undoneSteps = [];
+  }
+  getTargetRangeOf(e) {
+    const selection = document.getSelection();
+    if (!selection || selection.rangeCount < 1) return;
+    let range = selection.getRangeAt(0);
+    if (range.collapsed) {
+      const ranges = e.getTargetRanges();
+      if (ranges && ranges.length > 0) {
+        range.setStart(ranges[0].startContainer, ranges[0].startOffset);
+        range.setEnd(ranges[0].endContainer, ranges[0].endOffset);
+      }
+    }
+    return range;
+  }
+  positionRangeFrom(targetRange, insertionText) {
+    const start = new Position(
+      this.editor.view,
+      targetRange.startContainer,
+      targetRange.startOffset
+    );
+    const end = new Position(
+      this.editor.view,
+      targetRange.endContainer,
+      targetRange.endOffset
+    );
+    if (insertionText) {
+      const lines = insertionText.split("\n");
+      end.char += lines[lines.length - 1].length;
+    }
+    return new PositionRange(start, end);
+  }
+  undo() {
+    const step = this.steps.pop();
+    if (!step) return;
+    if (step.type === 0 /* Insertion */) {
+      this.replaceRange(step.range, step.oldText);
+    } else if (step.type === 1 /* Deletion */) {
+      this.insertAt(step.range.start, step.oldText);
+    }
+    this.undoneSteps.push(step);
+  }
+  redo() {
+    const step = this.undoneSteps.pop();
+    if (!step) return;
+    if (step.type === 0 /* Insertion */) {
+      this.insertAt(step.range.start, step.newText);
+    } else if (step.type === 1 /* Deletion */) {
+      this.replaceRange(step.range, step.oldText);
+    }
+    this.steps.push(step);
+  }
+  replaceRange(range, text) {
+    const startLine = this.editor.view.getLineAt(range.start.line);
+    const endLine = this.editor.view.getLineAt(range.end.line);
+    if (!startLine || !endLine) return;
+    const startContent = this.editor.view.getTextInLine(startLine);
+    const endContent = this.editor.view.getTextInLine(endLine);
+    const before = startContent.slice(0, range.start.char);
+    const after = endContent.slice(range.end.char);
+    startLine.innerText = before + text + after;
+  }
+  insertAt(position, text) {
+    console.log(text);
+    const line = this.editor.view.getLineAt(position.line);
+    if (!line) return;
+    const content = this.editor.view.getTextInLine(line);
+    const before = content.slice(0, position.char);
+    const after = content.slice(position.char);
+    console.log(before, after);
+    line.innerText = before + text + after;
+    this.editor.updateLine(line);
+  }
+};
 
 // src/multiline.ts
 var MultilineRange = class {
@@ -1041,54 +1205,29 @@ var MultilineManager2 = class {
 // src/selection.ts
 var InlineSelection = class {
   constructor(view, node, offset) {
-    this.offset = 0;
-    const activeLine = view.getLineElementFrom(node);
-    if (!activeLine) return;
-    if (node.parentElement?.tagName === "SPAN") {
-      node = node.parentElement;
-    }
-    const childNodes = Array.from(activeLine.childNodes);
-    if (node.nodeName === "DIV") {
-      this.offset = this.sumNodeLengths(
-        childNodes,
-        0,
-        offset
-      );
-      return;
-    }
-    this.offset = this.sumNodeLengths(
-      childNodes,
-      0,
-      childNodes.indexOf(node)
-    ) + offset;
+    this.offset = new Position(view, node, offset);
   }
-  sumNodeLengths(nodes, start, end) {
-    return nodes.slice(start, end).reduce(
-      (sum, node) => node.textContent ? sum + node.textContent.length : sum,
-      0
-    );
-  }
-  renderIn(activeLine) {
+  renderIn(line) {
     const selection = document.getSelection();
     if (!selection) return;
-    if (this.offset === 0) {
-      selection.setPosition(activeLine);
+    if (this.offset.char === 0) {
+      selection.setPosition(line);
       return;
     }
-    for (let childNode of activeLine.childNodes) {
+    for (let childNode of line.childNodes) {
       const nodeText = childNode.textContent;
       if (!nodeText) continue;
-      if (this.offset <= nodeText.length) {
+      if (this.offset.char <= nodeText.length) {
         if (childNode.nodeType !== Node.TEXT_NODE) {
           childNode = childNode.childNodes[0];
         }
-        selection.setPosition(childNode, this.offset);
+        selection.setPosition(childNode, this.offset.char);
         return;
       } else {
-        this.offset -= nodeText.length;
+        this.offset.char -= nodeText.length;
       }
     }
-    selection.setPosition(activeLine.lastChild);
+    selection.setPosition(line.lastChild);
   }
 };
 
@@ -1183,6 +1322,10 @@ var View = class {
         if (line.childNodes[i + 1] && line.childNodes[i + 1].nodeName === "DIV") {
           lineText += "\n";
         }
+      } else if (childNode.nodeName === "BR") {
+        if (line.childNodes[i + 1]) {
+          lineText += "\n";
+        }
       } else {
         lineText += childNode.textContent;
       }
@@ -1270,6 +1413,7 @@ var Editor = class {
     this.container.addEventListener("input", (e) => {
       this.handleInput(e);
     });
+    this.history = new EditorHistory(this);
     this.lineCount = 0;
     this.view = new View(container);
     this.mlManager = new MultilineManager2(this.view);
@@ -1302,7 +1446,7 @@ var Editor = class {
     }
     const activeLine = this.view.getActiveLine();
     if (!activeLine) {
-      if (e.inputType === "deleteByCut") {
+      if (e.inputType.includes("delete")) {
         const selection = document.getSelection();
         if (selection && selection.anchorNode === this.container) {
           const textNode = this.container.childNodes[selection.anchorOffset];

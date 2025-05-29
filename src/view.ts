@@ -99,15 +99,21 @@ export class View {
 
     getTextInLine(line: HTMLElement): string {
 
-        /* In the case of a copy/paste or other accidental document
+        /* 
+         * In the case of a copy/paste or other accidental document
          * malformation, we could have line elements nested inside of each
          * other. The parser rewrites these properly as long as we collect
          * the text with newlines included between those sub-elements.
+         *
+         * We could also have line break elements in non-blank lines, depending
+         * on how the browser engine handles newlines, so we take those into
+         * consideration as well.
          */
         let lineText = "";
         for (let i = 0; i < line.childNodes.length; i++) {
             const childNode = line.childNodes[i];
-            /* If the child node is another line, we recursively add its text
+            /* 
+             * If the child node is another line, we recursively add its text
              * contents to the collected text. If the next child node is
              * also a sub-line, rather than  text node or line break, then we
              * also add a newline to separate them.
@@ -118,6 +124,8 @@ export class View {
                     line.childNodes[i + 1].nodeName === "DIV") {
                     lineText += "\n";
                 }
+            } else if (childNode.nodeName === "BR" && line.childNodes[i + 1]) {
+                lineText += "\n";
             } else {
                 lineText += childNode.textContent;
             }
@@ -183,7 +191,7 @@ export class View {
                  * this can only happen via paste.
                  */
                 if (shouldReplaceSelection && pasteOffset !== undefined) {
-                    inlineSelection.offset = pasteOffset;
+                    inlineSelection.offset.char = pasteOffset;
                     inlineSelection.renderIn(line);
                 } else {
                     if (activeLine && line === activeLine) {
@@ -206,7 +214,8 @@ export class View {
 
     writeLine(line: HTMLElement, block: Block) {
 
-        /* Convert each run in the block into an HTML node and store them in
+        /* 
+         * Convert each run in the block into an HTML node and store them in
          * a DocumentFragment, which we insert into the line element after
          * it's constructed.
          */

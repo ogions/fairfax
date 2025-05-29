@@ -1,10 +1,12 @@
 import { Parser, ParserContext } from "fairfax";
+import { EditorHistory } from "./history";
 import { MultilineManager } from "./multiline";
 import { RangeContext, LineRange } from "./range";
 import { View } from "./view";
 
 export class Editor {
     container: HTMLElement;
+    history: EditorHistory;
     lineCount: number;
     mlManager: MultilineManager;
     parser = new Parser();
@@ -17,7 +19,7 @@ export class Editor {
         this.container.addEventListener("input", (e) => {
             this.handleInput(e as InputEvent)
         });
-
+        this.history = new EditorHistory(this);
         this.lineCount = 0;
         this.view = new View(container);
         this.mlManager = new MultilineManager(this.view);
@@ -50,6 +52,7 @@ export class Editor {
     }
 
     handleInput(e: InputEvent) {
+
         // Ignore composition events to avoid duplicating text
         if (e.inputType === "insertCompositionText") {
             return;
@@ -58,7 +61,7 @@ export class Editor {
         const activeLine = this.view.getActiveLine();
 
         if (!activeLine) {
-            if (e.inputType === "deleteByCut") {
+            if (e.inputType.includes("delete")) {
                 /*
                  * Sometimes, a cut (i.e. via CTRL+X) will delete the active
                  * line element and replace it with an empty text node. We'll
