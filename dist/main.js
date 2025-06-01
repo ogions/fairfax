@@ -965,6 +965,9 @@ var Position = class {
       0
     );
   }
+  matches(position) {
+    return this.line === position.line && this.char === position.char;
+  }
 };
 var PositionRange = class {
   constructor(a, b) {
@@ -986,15 +989,31 @@ var Step = class {
     this.oldText = oldText;
     this.newText = newText;
   }
+  followedBy(step) {
+    return this.type === 0 /* Insertion */ && step.type === 0 /* Insertion */ && this.range.end.matches(step.range.start) || this.type === 1 /* Deletion */ && step.type === 1 /* Deletion */ && this.range.start.matches(step.range.end);
+  }
+  join(step) {
+    if (this.type === 0 /* Insertion */) {
+      this.range.end = step.range.end;
+      this.newText += step.newText;
+    } else if (this.type === 1 /* Deletion */) {
+      this.range.start = step.range.start;
+      this.oldText = step.oldText + this.oldText;
+    }
+  }
 };
-var EditorHistory = class {
+var EditorHistory = class _EditorHistory {
   constructor(editor) {
     this.steps = [];
     this.undoneSteps = [];
+    this.lastEditTime = 0;
     this.editor = editor;
     editor.container.addEventListener("beforeinput", (e) => {
       this.handleInput(e);
     });
+  }
+  static {
+    this.groupThreshold = 1e3;
   }
   handleInput(e) {
     const type = e.inputType.includes("insert") ? 0 /* Insertion */ : 1 /* Deletion */;
@@ -1008,7 +1027,19 @@ var EditorHistory = class {
     const newText = e.data ?? (e.inputType === "insertParagraph" ? "\n" : e.dataTransfer?.getData("text") ?? "");
     const range = this.positionRangeFrom(targetRange, newText);
     console.log(range, type, oldText, newText);
-    this.steps.push(new Step(range, type, oldText, newText));
+    const step = new Step(range, type, oldText, newText);
+    const now = Date.now();
+    if (now - this.lastEditTime < _EditorHistory.groupThreshold) {
+      const lastStep = this.steps[this.steps.length - 1];
+      if (lastStep && lastStep.followedBy(step)) {
+        lastStep.join(step);
+      } else {
+        this.steps.push(step);
+      }
+    } else {
+      this.steps.push(step);
+    }
+    this.lastEditTime = now;
     if (this.steps.length > 99) {
       this.steps.shift();
     }
@@ -1028,6 +1059,7 @@ var EditorHistory = class {
     return range;
   }
   positionRangeFrom(targetRange, insertionText) {
+    console.log(targetRange.endOffset);
     const start = new Position(
       this.editor.view,
       targetRange.startContainer,
@@ -1040,7 +1072,12 @@ var EditorHistory = class {
     );
     if (insertionText) {
       const lines = insertionText.split("\n");
-      end.char += lines[lines.length - 1].length;
+      end.line += lines.length - 1;
+      if (lines.length > 1) {
+        end.char = lines[lines.length - 1].length;
+      } else {
+        end.char += insertionText.length;
+      }
     }
     return new PositionRange(start, end);
   }
@@ -1060,7 +1097,7 @@ var EditorHistory = class {
     if (step.type === 0 /* Insertion */) {
       this.insertAt(step.range.start, step.newText);
     } else if (step.type === 1 /* Deletion */) {
-      this.replaceRange(step.range, step.oldText);
+      this.replaceRange(step.range, step.newText);
     }
     this.steps.push(step);
   }
@@ -1072,17 +1109,20 @@ var EditorHistory = class {
     const endContent = this.editor.view.getTextInLine(endLine);
     const before = startContent.slice(0, range.start.char);
     const after = endContent.slice(range.end.char);
+    for (let i = range.end.line; i > range.start.line; i--) {
+      this.editor.view.getLineAt(i)?.remove();
+    }
     startLine.innerText = before + text + after;
+    this.editor.updateLine(startLine, true);
   }
   insertAt(position, text) {
-    console.log(text);
     const line = this.editor.view.getLineAt(position.line);
     if (!line) return;
     const content = this.editor.view.getTextInLine(line);
     const before = content.slice(0, position.char);
     const after = content.slice(position.char);
-    line.innerText = before + text + after;
-    this.editor.updateLine(line);
+    line.textContent = before + text + after;
+    this.editor.updateLine(line, true);
   }
 };
 
@@ -1308,7 +1348,7 @@ var View = class {
       const childNode = line.childNodes[i];
       if (childNode.nodeName === "DIV") {
         lineText += this.getTextInLine(childNode);
-        if (line.childNodes[i + 1] && line.childNodes[i + 1].nodeName === "DIV") {
+        if (line.childNodes[i + 1]?.nodeName === "DIV") {
           lineText += "\n";
         }
       } else if (childNode.nodeName === "BR" && line.childNodes[i + 1]) {

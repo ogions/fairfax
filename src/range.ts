@@ -146,6 +146,13 @@ export class Position {
             0
         );
     }
+
+    matches(position: Position) {
+        return (
+            this.line === position.line &&
+            this.char === position.char
+        );
+    }
 }
 
 export class PositionRange {

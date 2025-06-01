@@ -120,8 +120,7 @@ export class View {
              */
             if (childNode.nodeName === "DIV") {
                 lineText += this.getTextInLine(childNode as HTMLElement);
-                if (line.childNodes[i + 1] &&
-                    line.childNodes[i + 1].nodeName === "DIV") {
+                if (line.childNodes[i + 1]?.nodeName === "DIV") {
                     lineText += "\n";
                 }
             } else if (childNode.nodeName === "BR" && line.childNodes[i + 1]) {
