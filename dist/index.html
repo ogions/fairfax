@@ -11,6 +11,7 @@
                 const editor = new Editor(container);
                 container.addEventListener("keydown", (e) => {
                     if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+                        e.preventDefault();
                         if (e.shiftKey) {
                             editor.redo();
                         } else {
