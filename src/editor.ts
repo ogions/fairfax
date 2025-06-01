@@ -217,4 +217,12 @@ export class Editor {
             this.title = newTitle;
         }
     }
+
+    undo() {
+        this.history.undo();
+    }
+
+    redo() {
+        this.history.redo();
+    }
 }

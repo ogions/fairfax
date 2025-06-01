@@ -31,17 +31,6 @@ export class EditorHistory {
         editor.container.addEventListener("beforeinput", (e) => {
             this.handleInput(e);
         });
-
-        editor.container.addEventListener("keydown", (e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === "z") {
-                e.preventDefault();
-                if (e.shiftKey) {
-                    this.redo();
-                } else {
-                    this.undo();
-                }
-            }
-        });
     }
 
     handleInput(e: InputEvent) {
@@ -53,17 +42,34 @@ export class EditorHistory {
         if (!selection) return;
         const targetRange = this.getTargetRangeOf(e);
         if (!targetRange) return;
+
+        /*
+         * The toString method of the Selection class includes whitespace, which
+         * the Range class's method does not. For that reason we assign the
+         * range back to a selection here.
+         */
         selection.removeAllRanges();
         selection.addRange(targetRange);
 
         const oldText = selection.toString();
 
+        /*
+         * Concise handling for the different potential types of input. A
+         * plain insertion will provide its text in the data field, but others
+         * are more complicated. If it's not any of these, we treat it as a
+         * deletion event and newText is an empty string.
+         */
         const newText = e.data ?? (
             e.inputType === "insertParagraph" ? "\n" : (
                 e.dataTransfer?.getData("text") ?? ""
             )
         ); 
 
+        /*
+         * We store history steps with PositionRanges rather than DOM Ranges,
+         * since we can't rely on the nodes referenced by DOM Ranges to still
+         * be around if we use the step later.
+         */
         const range = this.positionRangeFrom(targetRange, newText);
 
         console.log(range, type, oldText, newText);
@@ -71,6 +77,8 @@ export class EditorHistory {
         if (this.steps.length > 99) {
             this.steps.shift();
         }
+
+        // Reset the stack of redo steps when our history diverges.
         this.undoneSteps = [];
     } 
 
@@ -78,6 +86,13 @@ export class EditorHistory {
         const selection = document.getSelection();
         if (!selection || selection.rangeCount < 1) return;
         let range = selection.getRangeAt(0);
+
+        /*
+         * If the range is collapsed (i.e., a cursor), we instead reference the
+         * target range of the input event. However, since that's a
+         * StaticRange rather than a Range, we need to adapt the original Range
+         * object with the target range's data.
+         */
         if (range.collapsed) {
             const ranges = e.getTargetRanges();
             if (ranges && ranges.length > 0) {
@@ -85,6 +100,7 @@ export class EditorHistory {
                 range.setEnd(ranges[0].endContainer, ranges[0].endOffset);
             }
         }
+
         return range;
     }
 

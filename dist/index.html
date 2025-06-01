@@ -7,7 +7,18 @@
         <script type="module" defer>
             import { Editor } from "./main.js";
             const container = document.getElementById("monica");
-            if (container) new Editor(container);
+            if (container) {
+                const editor = new Editor(container);
+                container.addEventListener("keydown", (e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+                        if (e.shiftKey) {
+                            editor.redo();
+                        } else {
+                            editor.undo();
+                        }
+                    }
+                })
+            }
         </script>
     </head>
     <body>

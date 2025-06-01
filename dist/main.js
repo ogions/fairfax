@@ -880,6 +880,31 @@ var Parser = class _Parser {
 };
 
 // src/range.ts
+var LineRange = class _LineRange {
+  constructor(start, end) {
+    if (start <= end) {
+      this.start = start;
+      this.end = end;
+    } else {
+      this.start = end;
+      this.end = start;
+    }
+  }
+  overlaps(range) {
+    return this.start <= range.end && range.start <= this.end;
+  }
+  includesRange(range) {
+    return this.start <= range.start && this.end >= range.end;
+  }
+  includesIndex(index) {
+    return this.start <= index && this.end >= index;
+  }
+  extend(range) {
+    const start = Math.min(this.start, range.start);
+    const end = Math.max(this.end, range.end);
+    return new _LineRange(start, end);
+  }
+};
 var RangeContext = class {
   constructor(range, view) {
     this.previousLine = view.getLineAt(range.start - 1);
@@ -905,31 +930,6 @@ var RangeContext = class {
     if (this.nextLine) {
       this.nextLineIsBlank = this.nextLine.classList.contains("BlankLine");
     }
-  }
-};
-var LineRange = class _LineRange {
-  constructor(start, end) {
-    if (start <= end) {
-      this.start = start;
-      this.end = end;
-    } else {
-      this.start = end;
-      this.end = start;
-    }
-  }
-  overlaps(range) {
-    return this.start <= range.end && range.start <= this.end;
-  }
-  includesRange(range) {
-    return this.start <= range.start && this.end >= range.end;
-  }
-  includesIndex(index) {
-    return this.start <= index && this.end >= index;
-  }
-  extend(range) {
-    const start = Math.min(this.start, range.start);
-    const end = Math.max(this.end, range.end);
-    return new _LineRange(start, end);
   }
 };
 var Position = class {
@@ -994,16 +994,6 @@ var EditorHistory = class {
     this.editor = editor;
     editor.container.addEventListener("beforeinput", (e) => {
       this.handleInput(e);
-    });
-    editor.container.addEventListener("keydown", (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "z") {
-        e.preventDefault();
-        if (e.shiftKey) {
-          this.redo();
-        } else {
-          this.undo();
-        }
-      }
     });
   }
   handleInput(e) {
@@ -1091,7 +1081,6 @@ var EditorHistory = class {
     const content = this.editor.view.getTextInLine(line);
     const before = content.slice(0, position.char);
     const after = content.slice(position.char);
-    console.log(before, after);
     line.innerText = before + text + after;
     this.editor.updateLine(line);
   }
@@ -1322,10 +1311,8 @@ var View = class {
         if (line.childNodes[i + 1] && line.childNodes[i + 1].nodeName === "DIV") {
           lineText += "\n";
         }
-      } else if (childNode.nodeName === "BR") {
-        if (line.childNodes[i + 1]) {
-          lineText += "\n";
-        }
+      } else if (childNode.nodeName === "BR" && line.childNodes[i + 1]) {
+        lineText += "\n";
       } else {
         lineText += childNode.textContent;
       }
@@ -1356,7 +1343,7 @@ var View = class {
       if (shouldRewrite) {
         this.writeLine(line, block);
         if (shouldReplaceSelection && pasteOffset !== void 0) {
-          inlineSelection.offset = pasteOffset;
+          inlineSelection.offset.char = pasteOffset;
           inlineSelection.renderIn(line);
         } else {
           if (activeLine && line === activeLine) {
@@ -1535,6 +1522,12 @@ var Editor = class {
     if (this.title !== newTitle) {
       this.title = newTitle;
     }
+  }
+  undo() {
+    this.history.undo();
+  }
+  redo() {
+    this.history.redo();
   }
 };
 export {
