@@ -118,11 +118,9 @@ export class EditorHistory {
                 lastStep.join(step);
             } else {
                 this.steps.push(step);
-                this.editor.container.dispatchEvent(new Event("historyupdate"));
             }
         } else {
             this.steps.push(step);
-            this.editor.container.dispatchEvent(new Event("historyupdate"));
         }
 
         this.lastEditTime = now;
@@ -202,7 +200,6 @@ export class EditorHistory {
         }
 
         this.undoneSteps.push(step);
-        this.editor.container.dispatchEvent(new Event("historyupdate"));
     }
     
     redo() {
@@ -216,7 +213,6 @@ export class EditorHistory {
         }
 
         this.steps.push(step);
-        this.editor.container.dispatchEvent(new Event("historyupdate"));
     }
 
     replaceRange(range: PositionRange, text: string) {
