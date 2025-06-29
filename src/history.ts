@@ -45,7 +45,7 @@ class Step {
 }
 
 export class EditorHistory {
-    static groupThreshold = 1000;
+    static groupThreshold = 500;
     editor: Editor;
     steps: Step[] = [];
     undoneSteps: Step[] = [];
@@ -99,19 +99,30 @@ export class EditorHistory {
          */
         const range = this.positionRangeFrom(targetRange, newText);
 
-        console.log(range, type, oldText, newText);
         const step = new Step(range, type, oldText, newText);
 
+        /*
+         * Compare the current time against the last edit. If it's within the
+         * grouping threshold, then we combine this step with the last one. If
+         * the time difference is greater than the grouping threshold, then we
+         * push this step by itself onto the history stack.
+         */
         const now = Date.now();
         if (now - this.lastEditTime < EditorHistory.groupThreshold) {
+            /*
+             * Confirm that there IS a last step, and that it's contiguous with
+             * this one, before we combine them.
+             */
             const lastStep = this.steps[this.steps.length - 1];
             if (lastStep && lastStep.followedBy(step)) {
                 lastStep.join(step);
             } else {
                 this.steps.push(step);
+                this.editor.container.dispatchEvent(new Event("historyupdate"));
             }
         } else {
             this.steps.push(step);
+            this.editor.container.dispatchEvent(new Event("historyupdate"));
         }
 
         this.lastEditTime = now;
@@ -191,6 +202,7 @@ export class EditorHistory {
         }
 
         this.undoneSteps.push(step);
+        this.editor.container.dispatchEvent(new Event("historyupdate"));
     }
     
     redo() {
@@ -204,6 +216,7 @@ export class EditorHistory {
         }
 
         this.steps.push(step);
+        this.editor.container.dispatchEvent(new Event("historyupdate"));
     }
 
     replaceRange(range: PositionRange, text: string) {
