@@ -220,9 +220,17 @@ export class Editor {
 
     undo() {
         this.history.undo();
+        this.container.dispatchEvent(new InputEvent(
+            "input",
+            { inputType: "historyUndo" }
+        ));
     }
 
     redo() {
         this.history.redo();
+        this.container.dispatchEvent(new InputEvent(
+            "input",
+            { inputType: "historyRedo" }
+        ));
     }
 }
