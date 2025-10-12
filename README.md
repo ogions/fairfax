@@ -1,6 +1,6 @@
 # Monica
 
-Monica is a lightweight, browser-based Fountain editor.
+Monica is a lightweight, web-based Fountain editor.
 
 To try it out, you can clone the repo and run `npm test`.
 
@@ -10,7 +10,7 @@ Monica uses [Fairfax](https://github.com/ogions/fairfax), a Typescript-based par
 
 ## Usage
 
-Monica works within a browser. To initialize it, load the Monica module and create a new `Editor` with a container element as an argument.
+Monica uses web technology and the HTML `contenteditable` API. To initialize it, load the Monica module and create a new `Editor` with a container element as an argument.
 
 ```html
 <!DOCTYPE html>
