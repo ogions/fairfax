@@ -11,9 +11,9 @@
     "test": "npm run build && http-server ./dist"
   },
   "dependencies": {
-        "fairfax": "file:../fairfax"
-    },
+    "fairfax": "file:../fairfax"
+  },
   "devDependencies": {
-    "esbuild": "0.25.2"
+    "esbuild": "^0.25.2"
   }
 }
