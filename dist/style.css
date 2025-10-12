@@ -5,6 +5,7 @@ main {
     border: 1px solid gray;
 
     font-family: monospace;
+    font-size: 16px;
     white-space-collapse: preserve-spaces;
 }
 
@@ -22,6 +23,7 @@ main {
 
 .monica-dialogue {
     margin-left: 29%;
+    max-width: 39%;
 }
 
 .monica-dialogue.monica-dual {
