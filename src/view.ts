@@ -6,29 +6,29 @@ export class View {
 
     container: HTMLElement;
     blockMap = new Map([
-        [BlockType.BlankLine, "BlankLine"],
-        [BlockType.Action, "Action"],
-        [BlockType.SceneHeading, "SceneHeading"],
-        [BlockType.Character, "Character"],
-        [BlockType.Dialogue, "Dialogue"],
-        [BlockType.Parenthetical, "Parenthetical"],
-        [BlockType.Lyric, "Lyric"],
-        [BlockType.Transition, "Transition"],
-        [BlockType.PageBreak, "PageBreak"],
-        [BlockType.SectionHeading, "SectionHeading"],
-        [BlockType.Synopsis, "Synopsis"],
-        [BlockType.TitlePage, "TitlePage"]
+        [BlockType.BlankLine, "monica-blankline"],
+        [BlockType.Action, "monica-action"],
+        [BlockType.SceneHeading, "monica-sceneheading"],
+        [BlockType.Character, "monica-character"],
+        [BlockType.Dialogue, "monica-dialogue"],
+        [BlockType.Parenthetical, "monica-parenthetical"],
+        [BlockType.Lyric, "monica-lyric"],
+        [BlockType.Transition, "monica-transition"],
+        [BlockType.PageBreak, "monica-pagebreak"],
+        [BlockType.SectionHeading, "monica-sectionheading"],
+        [BlockType.Synopsis, "monica-synopsis"],
+        [BlockType.TitlePage, "monica-titlepage"]
     ]);
     styleMap = new Map([
-        [RunStyle.Bold, "Bold"],
-        [RunStyle.Italic, "Italic"],
-        [RunStyle.Underline, "Underline"],
-        [RunStyle.Boneyard, "Boneyard"],
-        [RunStyle.Note, "Note"],
-        [RunStyle.SceneNumber, "SceneNumber"],
-        [RunStyle.Markup, "Markup"],
-        [RunStyle.TitlePageKey, "TitlePageKey"],
-        [RunStyle.TitlePageValue, "TitlePageValue"]
+        [RunStyle.Bold, "monica-bold"],
+        [RunStyle.Italic, "monica-italic"],
+        [RunStyle.Underline, "monica-underline"],
+        [RunStyle.Boneyard, "monica-boneyard"],
+        [RunStyle.Note, "monica-note"],
+        [RunStyle.SceneNumber, "monica-scenenumber"],
+        [RunStyle.Markup, "monica-markup"],
+        [RunStyle.TitlePageKey, "monica-titlepagekey"],
+        [RunStyle.TitlePageValue, "monica-titlepagevalue"]
     ]);
 
     constructor(container: HTMLElement) {

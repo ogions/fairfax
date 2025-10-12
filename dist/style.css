@@ -8,90 +8,90 @@ main {
     white-space-collapse: preserve-spaces;
 }
 
-.SceneHeading {
+.monica-sceneheading {
     font-weight: bold;
 }
 
-.Character {
+.monica-character {
     margin-left: 50%;
 }
 
-.Character.Dual {
+.monica-character.monica-dual {
     margin-left: 60%;
 }
 
-.Dialogue {
+.monica-dialogue {
     margin-left: 25%;
 }
 
-.Dialogue.Dual {
+.monica-dialogue.monica-dual {
     margin-left: 35%;
 }
 
-.PageBreak {
+.monica-pagebreak {
     color: gray;
 }
 
-.Parenthetical {
+.monica-parenthetical {
     margin-left: 37%;
 }
 
-.Parenthetical.Dual {
+.monica-parenthetical.monica-dual {
     margin-left: 47%;
 }
 
-.Transition {
+.monica-transition {
     text-align: right;
 }
 
-.SectionHeading {
+.monica-sectionheading {
     color: purple;
 }
 
-.Synopsis {
+.monica-synopsis {
     color: green;
 }
 
-.Centered {
+.monica-centered {
     text-align: center;
 }
 
-.Bold {
+.monica-bold {
     font-weight: bold;
 }
 
-.Italic {
+.monica-italic {
     font-style: italic;
 }
 
-.Underline {
+.monica-underline {
     text-decoration: underline;
 }
 
-.Boneyard {
+.monica-boneyard {
     color: gray;
 }
 
-.Note {
+.monica-note {
     color: green;
 }
 
-.SceneNumber {
+.monica-scenenumber {
     color: blue;
 }
 
-.TitlePage {
+.monica-titlepage {
     color: gray;
 }
 
-.TitlePageKey {
+.monica-titlepagekey {
     color: green;
 }
 
-.TitlePageValue {
+.monica-titlepagevalue {
     color: purple;
 }
 
-.Markup {
+.monica-markup {
     color: gray;
 }
