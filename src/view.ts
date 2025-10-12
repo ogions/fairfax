@@ -242,12 +242,12 @@ export class View {
     }
     
     classLine(line: HTMLElement, block: Block) {
-        line.className = this.blockMap.get(block.type) ?? "Action";
+        line.className = this.blockMap.get(block.type) ?? "monica-action";
         if (block.centered) {
-            line.classList.add("Centered");
+            line.classList.add("monica-centered");
         }
         if (block.isDual) {
-            line.classList.add("Dual");
+            line.classList.add("monica-dual");
         }
     }
 }

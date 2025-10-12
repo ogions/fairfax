@@ -1058,7 +1058,6 @@ var EditorHistory = class _EditorHistory {
     return range;
   }
   positionRangeFrom(targetRange, insertionText) {
-    console.log(targetRange.endOffset);
     const start = new Position(
       this.editor.view,
       targetRange.startContainer,
@@ -1420,12 +1419,12 @@ var View = class {
     if (line.textContent === "") line.innerHTML = "<br>";
   }
   classLine(line, block) {
-    line.className = this.blockMap.get(block.type) ?? "Action";
+    line.className = this.blockMap.get(block.type) ?? "monica-action";
     if (block.centered) {
-      line.classList.add("Centered");
+      line.classList.add("monica-centered");
     }
     if (block.isDual) {
-      line.classList.add("Dual");
+      line.classList.add("monica-dual");
     }
   }
 };
