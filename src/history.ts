@@ -157,8 +157,6 @@ export class EditorHistory {
 
     positionRangeFrom(targetRange: Range, insertionText: string): PositionRange {
 
-        console.log(targetRange.endOffset);
-
         const start = new Position(
             this.editor.view,
             targetRange.startContainer,
