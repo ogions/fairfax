@@ -915,20 +915,20 @@ var RangeContext = class {
     this.nextLineIsBlank = true;
     this.previousLineIsBlank = true;
     if (this.previousLine) {
-      if (this.previousLine.classList.contains("Character") || this.previousLine.classList.contains("Dialogue") || this.previousLine.classList.contains("Parenthetical")) {
+      if (this.previousLine.classList.contains("monica-character") || this.previousLine.classList.contains("monica-dialogue") || this.previousLine.classList.contains("monica-parenthetical")) {
         this.isInDialogue = true;
         this.previousLineIsBlank = false;
-        if (this.previousLine.classList.contains("Dual")) {
+        if (this.previousLine.classList.contains("monica-dual")) {
           this.isInDualDialogue = true;
         }
       } else {
-        this.previousLineIsBlank = this.previousLine.classList.contains("BlankLine");
+        this.previousLineIsBlank = this.previousLine.classList.contains("monica-blankline");
       }
     } else {
       if (range.start === 0) this.isDocumentStart = true;
     }
     if (this.nextLine) {
-      this.nextLineIsBlank = this.nextLine.classList.contains("BlankLine");
+      this.nextLineIsBlank = this.nextLine.classList.contains("monica-blankline");
     }
   }
 };
