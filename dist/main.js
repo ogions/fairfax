@@ -1013,7 +1013,7 @@ var EditorHistory = class _EditorHistory {
     });
   }
   static {
-    this.groupThreshold = 1e3;
+    this.groupThreshold = 500;
   }
   handleInput(e) {
     const type = e.inputType.includes("insert") ? 0 /* Insertion */ : 1 /* Deletion */;
@@ -1026,7 +1026,6 @@ var EditorHistory = class _EditorHistory {
     const oldText = selection.toString();
     const newText = e.data ?? (e.inputType === "insertParagraph" ? "\n" : e.dataTransfer?.getData("text") ?? "");
     const range = this.positionRangeFrom(targetRange, newText);
-    console.log(range, type, oldText, newText);
     const step = new Step(range, type, oldText, newText);
     const now = Date.now();
     if (now - this.lastEditTime < _EditorHistory.groupThreshold) {
@@ -1264,29 +1263,29 @@ var InlineSelection = class {
 var View = class {
   constructor(container) {
     this.blockMap = /* @__PURE__ */ new Map([
-      [0 /* BlankLine */, "BlankLine"],
-      [2 /* Action */, "Action"],
-      [1 /* SceneHeading */, "SceneHeading"],
-      [3 /* Character */, "Character"],
-      [4 /* Dialogue */, "Dialogue"],
-      [5 /* Parenthetical */, "Parenthetical"],
-      [6 /* Lyric */, "Lyric"],
-      [7 /* Transition */, "Transition"],
-      [8 /* PageBreak */, "PageBreak"],
-      [9 /* SectionHeading */, "SectionHeading"],
-      [10 /* Synopsis */, "Synopsis"],
-      [11 /* TitlePage */, "TitlePage"]
+      [0 /* BlankLine */, "monica-blankline"],
+      [2 /* Action */, "monica-action"],
+      [1 /* SceneHeading */, "monica-sceneheading"],
+      [3 /* Character */, "monica-character"],
+      [4 /* Dialogue */, "monica-dialogue"],
+      [5 /* Parenthetical */, "monica-parenthetical"],
+      [6 /* Lyric */, "monica-lyric"],
+      [7 /* Transition */, "monica-transition"],
+      [8 /* PageBreak */, "monica-pagebreak"],
+      [9 /* SectionHeading */, "monica-sectionheading"],
+      [10 /* Synopsis */, "monica-synopsis"],
+      [11 /* TitlePage */, "monica-titlepage"]
     ]);
     this.styleMap = /* @__PURE__ */ new Map([
-      [0 /* Bold */, "Bold"],
-      [1 /* Italic */, "Italic"],
-      [2 /* Underline */, "Underline"],
-      [3 /* Boneyard */, "Boneyard"],
-      [4 /* Note */, "Note"],
-      [5 /* SceneNumber */, "SceneNumber"],
-      [6 /* Markup */, "Markup"],
-      [7 /* TitlePageKey */, "TitlePageKey"],
-      [8 /* TitlePageValue */, "TitlePageValue"]
+      [0 /* Bold */, "monica-bold"],
+      [1 /* Italic */, "monica-italic"],
+      [2 /* Underline */, "monica-underline"],
+      [3 /* Boneyard */, "monica-boneyard"],
+      [4 /* Note */, "monica-note"],
+      [5 /* SceneNumber */, "monica-scenenumber"],
+      [6 /* Markup */, "monica-markup"],
+      [7 /* TitlePageKey */, "monica-titlepagekey"],
+      [8 /* TitlePageValue */, "monica-titlepagevalue"]
     ]);
     this.container = container;
     this.resetContainer();
@@ -1565,9 +1564,17 @@ var Editor = class {
   }
   undo() {
     this.history.undo();
+    this.container.dispatchEvent(new InputEvent(
+      "input",
+      { inputType: "historyUndo" }
+    ));
   }
   redo() {
     this.history.redo();
+    this.container.dispatchEvent(new InputEvent(
+      "input",
+      { inputType: "historyRedo" }
+    ));
   }
 };
 export {
