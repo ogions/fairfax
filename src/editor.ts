@@ -106,8 +106,8 @@ export class Editor {
          * to rewrite it to reformat the flag.
          */
         if (
-            line.classList.contains("Dual") &&
-            line.classList.contains("Character")
+            line.classList.contains("monica-dual") &&
+            line.classList.contains("monica-character")
         ) {
             shouldRewrite = true;
         }
