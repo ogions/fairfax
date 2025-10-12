@@ -1,7 +1,7 @@
 {
   "name": "monica",
   "version": "0.1.0",
-  "description": "",
+  "description": "A Fountain editor component for the web.",
   "license": "MIT",
   "author": "Zach Lo",
   "type": "module",
@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "esbuild": "^0.25.2",
-    "http-server": "^14.1.1"
+    "http-server": "^14.1.1",
+    "typescript": "^5.9.3"
   }
 }
