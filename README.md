@@ -15,7 +15,6 @@ Monica uses web technology and the HTML `contenteditable` API. To initialize it,
 ```html
 <!DOCTYPE html>
 <head>
-    <script type="module" src="monica.js"></script>
     <script type="module" defer>
         import { Editor } from "./monica.js";
         const container = document.getElementById("monica");
