@@ -5,6 +5,12 @@
   "license": "MIT",
   "author": "Zach Lo",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/monica.js",
+      "types": "./dist/monica.d.ts"
+    }
+  },
   "files": ["dist"],
   "main": "dist/monica.js",
   "repository": {
