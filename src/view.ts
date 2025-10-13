@@ -145,6 +145,12 @@ export class View {
         for (let [i, block] of blocks.entries()) {
 
             let lineIndex = i + range.start;
+
+            /*
+             * If we're pasting multiple lines, and thus creating new elements,
+             * we'll need to reset the selection (cursor) after those elements are
+             * created. I think.
+             */
             let shouldReplaceSelection = false;
 
             /* 
@@ -234,8 +240,7 @@ export class View {
                 fragment.append(span);
             }
         }
-        line.innerHTML = "";
-        line.appendChild(fragment);
+        line.replaceChildren(fragment);
             
         // If the line is empty, we keep a line break node.
         if (line.textContent === "") line.innerHTML = "<br>";

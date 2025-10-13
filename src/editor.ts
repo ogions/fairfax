@@ -28,11 +28,11 @@ export class Editor {
 
     load(content: string) {
         const parserContext = new ParserContext(
-            true,
-            false,
-            false,
-            true,
-            true
+            true, /* isDocumentStart */
+            false, /* isInDialogue */
+            false, /* isInDualDialogue */
+            true, /* nextLineIsBlank */
+            true /* previousLineIsBlank */
         );
         const fairfaxDocument = this.parser.parse(content, parserContext);
         
@@ -47,7 +47,7 @@ export class Editor {
     getContent(): string {
         const range = new LineRange(0, this.container.childElementCount - 1);
         const content = this.view.getTextInRange(range);
-        this.updateEntire();
+        this.updateRange(range);
         return content;
     }
 
@@ -146,7 +146,7 @@ export class Editor {
             context.nextLineIsBlank,
             context.previousLineIsBlank
         );
-        const [firstLineStartClass, lastLineStartClass] = this.getBorderClasses(range);
+        const [firstLineInitialClass, lastLineInitialClass] = this.getNeighborClasses(range);
 
         const fairfaxDocument = this.parser.parse(text, parserContext);
         this.mlManager.manage(fairfaxDocument, range);
@@ -185,19 +185,14 @@ export class Editor {
          * potential for overflow. However, there are no Fountain elements I
          * can think of at the moment that would cause that.
          */
-        const [firstLineEndClass, lastLineEndClass] = this.getBorderClasses(range);
+        const [firstLineEndClass, lastLineEndClass] = this.getNeighborClasses(range);
         if (
-            firstLineStartClass != firstLineEndClass ||
-            lastLineStartClass != lastLineEndClass ||
+            firstLineInitialClass != firstLineEndClass ||
+            lastLineInitialClass != lastLineEndClass ||
             difference != 0
         ) {
             this.updateNeighbors(context);
         }
-    }
-
-    updateEntire() {
-        const range = new LineRange(0, this.container.childElementCount - 1);
-        this.updateRange(range);
     }
 
     updateNeighbors(context: RangeContext) {
@@ -205,7 +200,7 @@ export class Editor {
         if (context.previousLine) this.updateLine(context.previousLine);
     }
 
-    getBorderClasses(range: LineRange): [string | undefined, string | undefined] {
+    getNeighborClasses(range: LineRange): [string | undefined, string | undefined] {
         const firstLine = this.view.getLineAt(range.start);
         const lastLine = this.view.getLineAt(range.end);
         return [firstLine?.className, lastLine?.className];
