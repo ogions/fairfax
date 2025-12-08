@@ -1,4 +1,4 @@
-import { Parser, ParserContext } from "fairfax";
+import { Parser, ParserContext } from "@goldenrod-app/hyperion";
 import { EditorHistory } from "./history";
 import { MultilineManager } from "./multiline";
 import { RangeContext, LineRange } from "./range";
@@ -34,14 +34,14 @@ export class Editor {
             true, /* nextLineIsBlank */
             true /* previousLineIsBlank */
         );
-        const fairfaxDocument = this.parser.parse(content, parserContext);
+        const hyperionDocument = this.parser.parse(content, parserContext);
         
         this.view.resetContainer();
         const range = new LineRange(0, 0);
-        this.mlManager.manage(fairfaxDocument, range);
-        this.view.updateRange(range, fairfaxDocument.blocks, true);
+        this.mlManager.manage(hyperionDocument, range);
+        this.view.updateRange(range, hyperionDocument.blocks, true);
 
-        this.title = fairfaxDocument.titlePage.get("Title") || "";
+        this.title = hyperionDocument.titlePage.get("Title") || "";
     }
 
     getContent(): string {
@@ -106,8 +106,8 @@ export class Editor {
          * to rewrite it to reformat the flag.
          */
         if (
-            line.classList.contains("monica-dual") &&
-            line.classList.contains("monica-character")
+            line.classList.contains("fairfax-dual") &&
+            line.classList.contains("fairfax-character")
         ) {
             shouldRewrite = true;
         }
@@ -148,11 +148,11 @@ export class Editor {
         );
         const [firstLineInitialClass, lastLineInitialClass] = this.getNeighborClasses(range);
 
-        const fairfaxDocument = this.parser.parse(text, parserContext);
-        this.mlManager.manage(fairfaxDocument, range);
-        this.handleTitleChange(fairfaxDocument.titlePage.get("Title"));
+        const hyperionDocument = this.parser.parse(text, parserContext);
+        this.mlManager.manage(hyperionDocument, range);
+        this.handleTitleChange(hyperionDocument.titlePage.get("Title"));
 
-        this.view.updateRange(range, fairfaxDocument.blocks, shouldRewrite ?? false, pasteOffset);
+        this.view.updateRange(range, hyperionDocument.blocks, shouldRewrite ?? false, pasteOffset);
 
         /*
          * If we've changed the number of lines in any way (adding, deleting,

@@ -70,24 +70,24 @@ export class RangeContext {
         this.previousLineIsBlank = true;
 
         if (this.previousLine) {
-            if (this.previousLine.classList.contains("monica-character") ||
-                this.previousLine.classList.contains("monica-dialogue") ||
-                this.previousLine.classList.contains("monica-parenthetical")) {
+            if (this.previousLine.classList.contains("fairfax-character") ||
+                this.previousLine.classList.contains("fairfax-dialogue") ||
+                this.previousLine.classList.contains("fairfax-parenthetical")) {
 
                 this.isInDialogue = true;
                 this.previousLineIsBlank = false;
 
-                if (this.previousLine.classList.contains("monica-dual")) {
+                if (this.previousLine.classList.contains("fairfax-dual")) {
                     this.isInDualDialogue = true;
                 }
             } else {
-                this.previousLineIsBlank = this.previousLine.classList.contains("monica-blankline");
+                this.previousLineIsBlank = this.previousLine.classList.contains("fairfax-blankline");
             }
         } else {
             if (range.start === 0) this.isDocumentStart = true;
         }
         if (this.nextLine) {
-            this.nextLineIsBlank = this.nextLine.classList.contains("monica-blankline");
+            this.nextLineIsBlank = this.nextLine.classList.contains("fairfax-blankline");
         }
     }
 }

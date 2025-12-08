@@ -1,28 +1,28 @@
-# Monica
+# Fairfax
 
-Monica is a lightweight, web-based Fountain editor.
+Fairfax is a lightweight, web-based Fountain editor.
 
 To try it out, you can clone the repo and run `npm test`.
 
 ## Dependencies
 
-Monica uses [Fairfax](https://github.com/ogions/fairfax), a Typescript-based parser for Fountain screenplay markup. For more information on Fountain, see [the website](https://fountain.io/).
+Fairfax uses [Hyperion](https://github.com/ogions/hyperion), a Typescript-based parser for Fountain screenplay markup. For more information on Fountain, see [the website](https://fountain.io/).
 
 ## Usage
 
-Monica uses web technology and the HTML `contenteditable` attribute. To initialize it, create a new `Editor` with a container element as an argument.
+Fairfax uses web technology and the HTML `contenteditable` attribute. To initialize it, create a new `Editor` with a container element as an argument.
 
 ```html
 <!DOCTYPE html>
 <head>
     <script type="module" defer>
-        import { Editor } from "./monica.js";
-        const container = document.getElementById("monica");
+        import { Editor } from "./fairfax.js";
+        const container = document.getElementById("fairfax");
         if (container) new Editor(container);
     </script>
 </head>
 <body>
-    <main id="monica"></main>
+    <main id="fairfax"></main>
 </body>
 ```
 
@@ -43,13 +43,13 @@ container.addEventListener("keydown", (e) => {
 
 ## Styling
 
-Monica assigns classes to HTML elements, but it does not directly apply styling. In order for the displayed text to resemble a screenplay, it must be styled with CSS.
+Fairfax assigns classes to HTML elements, but it does not directly apply styling. In order for the displayed text to resemble a screenplay, it must be styled with CSS.
 
 A set of reasonable defaults is available at `demo/style.css`.
 
 ## License
 
-Monica is available under the MIT license.
+Fairfax is available under the MIT license.
 
 ---
 

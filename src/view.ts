@@ -1,4 +1,4 @@
-import { Block, BlockType, RunStyle } from "fairfax";
+import { Block, BlockType, RunStyle } from "@goldenrod-app/hyperion";
 import { LineRange } from "./range";
 import { InlineSelection } from "./selection";
 
@@ -6,29 +6,29 @@ export class View {
 
     container: HTMLElement;
     blockMap = new Map([
-        [BlockType.BlankLine, "monica-blankline"],
-        [BlockType.Action, "monica-action"],
-        [BlockType.SceneHeading, "monica-sceneheading"],
-        [BlockType.Character, "monica-character"],
-        [BlockType.Dialogue, "monica-dialogue"],
-        [BlockType.Parenthetical, "monica-parenthetical"],
-        [BlockType.Lyric, "monica-lyric"],
-        [BlockType.Transition, "monica-transition"],
-        [BlockType.PageBreak, "monica-pagebreak"],
-        [BlockType.SectionHeading, "monica-sectionheading"],
-        [BlockType.Synopsis, "monica-synopsis"],
-        [BlockType.TitlePage, "monica-titlepage"]
+        [BlockType.BlankLine, "fairfax-blankline"],
+        [BlockType.Action, "fairfax-action"],
+        [BlockType.SceneHeading, "fairfax-sceneheading"],
+        [BlockType.Character, "fairfax-character"],
+        [BlockType.Dialogue, "fairfax-dialogue"],
+        [BlockType.Parenthetical, "fairfax-parenthetical"],
+        [BlockType.Lyric, "fairfax-lyric"],
+        [BlockType.Transition, "fairfax-transition"],
+        [BlockType.PageBreak, "fairfax-pagebreak"],
+        [BlockType.SectionHeading, "fairfax-sectionheading"],
+        [BlockType.Synopsis, "fairfax-synopsis"],
+        [BlockType.TitlePage, "fairfax-titlepage"]
     ]);
     styleMap = new Map([
-        [RunStyle.Bold, "monica-bold"],
-        [RunStyle.Italic, "monica-italic"],
-        [RunStyle.Underline, "monica-underline"],
-        [RunStyle.Boneyard, "monica-boneyard"],
-        [RunStyle.Note, "monica-note"],
-        [RunStyle.SceneNumber, "monica-scenenumber"],
-        [RunStyle.Markup, "monica-markup"],
-        [RunStyle.TitlePageKey, "monica-titlepagekey"],
-        [RunStyle.TitlePageValue, "monica-titlepagevalue"]
+        [RunStyle.Bold, "fairfax-bold"],
+        [RunStyle.Italic, "fairfax-italic"],
+        [RunStyle.Underline, "fairfax-underline"],
+        [RunStyle.Boneyard, "fairfax-boneyard"],
+        [RunStyle.Note, "fairfax-note"],
+        [RunStyle.SceneNumber, "fairfax-scenenumber"],
+        [RunStyle.Markup, "fairfax-markup"],
+        [RunStyle.TitlePageKey, "fairfax-titlepagekey"],
+        [RunStyle.TitlePageValue, "fairfax-titlepagevalue"]
     ]);
 
     constructor(container: HTMLElement) {
@@ -247,12 +247,12 @@ export class View {
     }
     
     classLine(line: HTMLElement, block: Block) {
-        line.className = this.blockMap.get(block.type) ?? "monica-action";
+        line.className = this.blockMap.get(block.type) ?? "fairfax-action";
         if (block.centered) {
-            line.classList.add("monica-centered");
+            line.classList.add("fairfax-centered");
         }
         if (block.isDual) {
-            line.classList.add("monica-dual");
+            line.classList.add("fairfax-dual");
         }
     }
 }

@@ -1,5 +1,5 @@
 {
-  "name": "monica-editor",
+  "name": "@goldenrod-app/fairfax",
   "version": "0.1.0",
   "description": "A Fountain editor component for the web.",
   "license": "MIT",
@@ -7,26 +7,26 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/monica.js",
-      "types": "./dist/monica.d.ts"
+      "import": "./dist/fairfax.js",
+      "types": "./dist/fairfax.d.ts"
     }
   },
   "files": ["dist"],
-  "main": "dist/monica.js",
+  "main": "dist/fairfax.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ogions/monica"
+    "url": "https://github.com/ogions/fairfax"
   },
   "scripts": {
     "clean": "rm -rf dist",
     "build:types": "tsc --emitDeclarationOnly --outDir dist",
-    "build:esbuild": "esbuild src/monica.ts --bundle --format=esm --outfile=dist/monica.js",
+    "build:esbuild": "esbuild src/fairfax.ts --bundle --format=esm --outfile=dist/fairfax.js",
     "build": "npm run clean && npm run build:types && npm run build:esbuild",
-    "test": "npm run build && cp dist/monica.js demo/monica.js && http-server demo",
+    "test": "npm run build && cp dist/fairfax.js demo/fairfax.js && http-server demo",
     "prepare": "npm run build"
   },
   "dependencies": {
-    "fairfax": "^0.1.0"
+    "@goldenrod-app/hyperion": "^0.1.0"
   },
   "devDependencies": {
     "esbuild": "^0.25.2",

@@ -1,4 +1,4 @@
-import { Document, MultilineType } from "fairfax";
+import { Document, MultilineType } from "@goldenrod-app/hyperion";
 import { LineRange } from "./range";
 import { View } from "./view";
 
@@ -37,7 +37,7 @@ export class MultilineManager {
         this.view = view;
     }
 
-    manage(fairfaxDocument: Document, range: LineRange) {
+    manage(hyperionDocument: Document, range: LineRange) {
         // Clear any active ranges that are being reprocessed
         for (let multiline of this.activeMultilines) {
             if (range.includesRange(multiline.range)) {
@@ -54,7 +54,7 @@ export class MultilineManager {
         }
 
         // Add completed multiline structures to active ranges
-        for (let structure of fairfaxDocument.activeMultilines) {
+        for (let structure of hyperionDocument.activeMultilines) {
             const start = structure.start + range.start;
             const end = structure.end + range.start;
             this.activeMultilines.add(new MultilineRange(
@@ -64,7 +64,7 @@ export class MultilineManager {
         }
 
         // Collect open structures and see if we have any matches
-        for (let structure of fairfaxDocument.openMultilines) {
+        for (let structure of hyperionDocument.openMultilines) {
             const end = new MultilineEnd(
                 structure.type,
                 structure.index + range.start,

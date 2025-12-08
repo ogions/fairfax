@@ -9,92 +9,92 @@ main {
     white-space-collapse: preserve-spaces;
 }
 
-.monica-sceneheading {
+.fairfax-sceneheading {
     font-weight: bold;
 }
 
-.monica-character {
+.fairfax-character {
     margin-left: 42%;
 }
 
-.monica-character.monica-dual {
+.fairfax-character.fairfax-dual {
     margin-left: 60%;
 }
 
-.monica-dialogue {
+.fairfax-dialogue {
     margin-left: 29%;
     max-width: 39%;
 }
 
-.monica-dialogue.monica-dual {
+.fairfax-dialogue.fairfax-dual {
     margin-left: 35%;
 }
 
-.monica-pagebreak {
+.fairfax-pagebreak {
     color: gray;
 }
 
-.monica-parenthetical {
+.fairfax-parenthetical {
     margin-left: 35%;
 }
 
-.monica-parenthetical.monica-dual {
+.fairfax-parenthetical.fairfax-dual {
     margin-left: 47%;
 }
 
-.monica-transition {
+.fairfax-transition {
     text-align: right;
 }
 
-.monica-sectionheading {
+.fairfax-sectionheading {
     color: purple;
     font-weight: bold;
 }
 
-.monica-synopsis {
+.fairfax-synopsis {
     color: green;
 }
 
-.monica-centered {
+.fairfax-centered {
     text-align: center;
 }
 
-.monica-bold {
+.fairfax-bold {
     font-weight: bold;
 }
 
-.monica-italic {
+.fairfax-italic {
     font-style: italic;
 }
 
-.monica-underline {
+.fairfax-underline {
     text-decoration: underline;
 }
 
-.monica-boneyard {
+.fairfax-boneyard {
     color: gray;
 }
 
-.monica-note {
+.fairfax-note {
     color: green;
 }
 
-.monica-scenenumber {
+.fairfax-scenenumber {
     color: blue;
 }
 
-.monica-titlepage {
+.fairfax-titlepage {
     color: gray;
 }
 
-.monica-titlepagekey {
+.fairfax-titlepagekey {
     color: green;
 }
 
-.monica-titlepagevalue {
+.fairfax-titlepagevalue {
     color: purple;
 }
 
-.monica-markup {
+.fairfax-markup {
     color: gray;
 }
