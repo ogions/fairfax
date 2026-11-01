@@ -255,4 +255,22 @@ export class View {
             line.classList.add("fairfax-dual");
         }
     }
+
+    smartSpace(line: HTMLElement) {
+        const prevLine = line.previousSibling as HTMLElement;
+        if (prevLine && this.shouldSingleSpace(prevLine)) {
+            console.log(prevLine);
+            console.log("should single space");
+            return;
+        }
+        const newLine = document.createElement("div");
+        newLine.innerHTML = "<br>";
+        line.before(newLine);
+    }
+    
+    shouldSingleSpace(prevLine: HTMLElement) {
+        return prevLine.classList.contains("fairfax-character") ||
+            prevLine.classList.contains("fairfax-parenthetical") ||
+            prevLine.classList.contains("fairfax-blankline");
+    }
 }

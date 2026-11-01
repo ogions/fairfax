@@ -12,8 +12,9 @@ export class Editor {
     parser = new Parser();
     view: View;
     title: string;
+    smartSpacing: boolean;
 
-    constructor(container: HTMLElement) {
+    constructor(container: HTMLElement, smartSpacing?: boolean) {
         this.container = container;
         this.container.setAttribute("contenteditable", "true");
         this.container.addEventListener("input", (e) => {
@@ -24,6 +25,7 @@ export class Editor {
         this.view = new View(container);
         this.mlManager = new MultilineManager(this.view);
         this.title = "";
+        this.smartSpacing = smartSpacing ?? false;
     }
 
     load(content: string) {
@@ -52,7 +54,7 @@ export class Editor {
     }
 
     handleInput(e: InputEvent) {
-
+        
         // Ignore composition events to avoid duplicating text
         if (e.inputType === "insertCompositionText") {
             return;
@@ -94,9 +96,15 @@ export class Editor {
             if (selection) {
                 this.updateLine(activeLine, true, selection.anchorOffset);
             }
+            return;
         } else {
-            this.updateLine(activeLine, true);
+            // If smart spacing is turned on, check if we should add an extra line.
+            if (this.smartSpacing && e.inputType === "insertParagraph") {
+                this.view.smartSpace(activeLine);
+            }
         }
+        
+        this.updateLine(activeLine, true);
     }
 
     updateLine(line: HTMLElement, shouldRewrite?: boolean, pasteOffset?: number) {
