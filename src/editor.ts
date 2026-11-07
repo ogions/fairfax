@@ -34,7 +34,8 @@ export class Editor {
             false, /* isInDialogue */
             false, /* isInDualDialogue */
             true, /* nextLineIsBlank */
-            true /* previousLineIsBlank */
+            true, /* previousLineIsBlank */
+            false /* anticipateCharacter */
         );
         const hyperionDocument = this.parser.parse(content, parserContext);
         
@@ -54,7 +55,14 @@ export class Editor {
     }
 
     handleInput(e: InputEvent) {
-        
+        /*
+        if (this.smartSpacing) {
+            for (const range of this.view.anticipated) {
+                this.updateRange(range, true);
+            }
+            this.view.anticipated = [];
+        }*/
+
         // Ignore composition events to avoid duplicating text
         if (e.inputType === "insertCompositionText") {
             return;
@@ -97,13 +105,13 @@ export class Editor {
                 this.updateLine(activeLine, true, selection.anchorOffset);
             }
             return;
-        } else {
-            // If smart spacing is turned on, check if we should add an extra line.
-            if (this.smartSpacing && e.inputType === "insertParagraph") {
-                this.view.smartSpace(activeLine);
-            }
         }
-        
+
+        // If smart spacing is turned on, check if we should add an extra line.
+        if (this.smartSpacing && e.inputType === "insertParagraph") {
+            this.view.smartSpace(activeLine);
+        }
+
         this.updateLine(activeLine, true);
     }
 
@@ -152,7 +160,8 @@ export class Editor {
             context.isInDialogue,
             context.isInDualDialogue,
             context.nextLineIsBlank,
-            context.previousLineIsBlank
+            context.previousLineIsBlank,
+            this.smartSpacing
         );
         const [firstLineInitialClass, lastLineInitialClass] = this.getNeighborClasses(range);
 
@@ -160,7 +169,7 @@ export class Editor {
         this.mlManager.manage(hyperionDocument, range);
         this.handleTitleChange(hyperionDocument.titlePage.get("Title"));
 
-        this.view.updateRange(range, hyperionDocument.blocks, shouldRewrite ?? false, pasteOffset);
+        this.view.updateRange(range, hyperionDocument.blocks, shouldRewrite ?? false, pasteOffset, this.smartSpacing);
 
         /*
          * If we've changed the number of lines in any way (adding, deleting,

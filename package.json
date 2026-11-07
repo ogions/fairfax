@@ -11,7 +11,9 @@
       "types": "./dist/fairfax.d.ts"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "main": "dist/fairfax.js",
   "repository": {
     "type": "git",

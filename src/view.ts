@@ -5,6 +5,7 @@ import { InlineSelection } from "./selection";
 export class View {
 
     container: HTMLElement;
+    anticipated: LineRange[];
     blockMap = new Map([
         [BlockType.BlankLine, "fairfax-blankline"],
         [BlockType.Action, "fairfax-action"],
@@ -33,6 +34,7 @@ export class View {
 
     constructor(container: HTMLElement) {
         this.container = container;
+        this.anticipated = [];
         this.resetContainer();
     }
 
@@ -132,7 +134,7 @@ export class View {
         return lineText;
     }
 
-    updateRange(range: LineRange, blocks: Block[], shouldRewrite: boolean, pasteOffset?: number) {
+    updateRange(range: LineRange, blocks: Block[], shouldRewrite: boolean, pasteOffset?: number, smartSpacing?: boolean) {
 
         // This is fragile, need to fix
         const selection = document.getSelection();
@@ -204,7 +206,12 @@ export class View {
                     }
                 };
             }
-            this.classLine(line, block);
+
+            if (smartSpacing && activeLine) {
+                this.classLine(line, block, activeLine, smartSpacing);
+            } else {
+                this.classLine(line, block);
+            }
         }
         /*
          * If the given range is larger than the number of blocks provided,
@@ -246,8 +253,20 @@ export class View {
         if (line.textContent === "") line.innerHTML = "<br>";
     }
     
-    classLine(line: HTMLElement, block: Block) {
+    classLine(line: HTMLElement, block: Block, activeLine?: HTMLElement, smartSpacing?: boolean) {
+
         line.className = this.blockMap.get(block.type) ?? "fairfax-action";
+
+        if (smartSpacing && block.couldBeChar && activeLine && this.isActiveInOrAfter(line, activeLine)) {
+            line.className = "fairfax-character";
+            /*
+            const lineIndex = this.getLineIndex(line);
+            if (typeof lineIndex === "number") {
+                this.anticipated.push(new LineRange(lineIndex, lineIndex));
+            }
+            */
+        }
+
         if (block.centered) {
             line.classList.add("fairfax-centered");
         }
@@ -259,8 +278,6 @@ export class View {
     smartSpace(line: HTMLElement) {
         const prevLine = line.previousSibling as HTMLElement;
         if (prevLine && this.shouldSingleSpace(prevLine)) {
-            console.log(prevLine);
-            console.log("should single space");
             return;
         }
         const newLine = document.createElement("div");
@@ -269,8 +286,15 @@ export class View {
     }
     
     shouldSingleSpace(prevLine: HTMLElement) {
-        return prevLine.classList.contains("fairfax-character") ||
+        return prevLine.classList.contains("fairfax-blankline") ||
+            prevLine.classList.contains("fairfax-character") ||
             prevLine.classList.contains("fairfax-parenthetical") ||
-            prevLine.classList.contains("fairfax-blankline");
+            prevLine.classList.contains("fairfax-lyric") ||
+            prevLine.classList.contains("fairfax-titlepage");
+    }
+
+    isActiveInOrAfter(line: HTMLElement, activeLine: HTMLElement) {
+        return line === activeLine ||
+            line.nextElementSibling === activeLine;
     }
 }
