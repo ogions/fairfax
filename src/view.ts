@@ -257,14 +257,12 @@ export class View {
 
         line.className = this.blockMap.get(block.type) ?? "fairfax-action";
 
-        if (smartSpacing && block.couldBeChar && activeLine && this.isActiveInOrAfter(line, activeLine)) {
+        if (smartSpacing && block.couldBeChar && this.isActiveInOrAfter(line, activeLine)) {
             line.className = "fairfax-character";
-            /*
             const lineIndex = this.getLineIndex(line);
             if (typeof lineIndex === "number") {
                 this.anticipated.push(new LineRange(lineIndex, lineIndex));
             }
-            */
         }
 
         if (block.centered) {
@@ -293,7 +291,8 @@ export class View {
             prevLine.classList.contains("fairfax-titlepage");
     }
 
-    isActiveInOrAfter(line: HTMLElement, activeLine: HTMLElement) {
+    isActiveInOrAfter(line: HTMLElement, activeLine: HTMLElement | undefined) {
+        if (!activeLine) return false;
         return line === activeLine ||
             line.nextElementSibling === activeLine;
     }

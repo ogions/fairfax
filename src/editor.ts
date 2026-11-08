@@ -55,13 +55,6 @@ export class Editor {
     }
 
     handleInput(e: InputEvent) {
-        /*
-        if (this.smartSpacing) {
-            for (const range of this.view.anticipated) {
-                this.updateRange(range, true);
-            }
-            this.view.anticipated = [];
-        }*/
 
         // Ignore composition events to avoid duplicating text
         if (e.inputType === "insertCompositionText") {
@@ -135,6 +128,18 @@ export class Editor {
     }
 
     updateRange(range: LineRange, shouldRewrite?: boolean, pasteOffset?: number) {
+
+        if (this.smartSpacing) {
+            let overlap;
+            for (const anticipatedRange of this.view.anticipated) {
+                overlap = range.extend(anticipatedRange);
+            }
+            this.view.anticipated = [];
+            if (overlap) {
+                this.updateRange(overlap, true);
+                return;
+            }
+        }
 
         const text = this.view.getTextInRange(range);
         const context = new RangeContext(range, this.view);

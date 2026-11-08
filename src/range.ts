@@ -33,6 +33,13 @@ export class LineRange {
         );
     }
 
+    neighborsRange(range: LineRange): boolean {
+        return (
+            this.start - range.end <= 1 ||
+            range.start - this.end <= 1
+        );
+    }
+
     includesIndex(index: number): boolean {
         return (
             this.start <= index &&
