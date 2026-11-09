@@ -255,10 +255,17 @@ export class View {
     
     classLine(line: HTMLElement, block: Block, activeLine?: HTMLElement, smartSpacing?: boolean) {
 
+        // Class line element according to block type
         line.className = this.blockMap.get(block.type) ?? "fairfax-action";
 
+        // Override if smart spacing is on and the block could be a character
         if (smartSpacing && block.couldBeChar && this.isActiveInOrAfter(line, activeLine)) {
             line.className = "fairfax-character";
+            /*
+             * We also need to mark this element as provisonally classed so that
+             * we can come back and reclass it once an edit is made somewhere
+             * else. This is done via the updateRange method of the Editor.
+             */
             const lineIndex = this.getLineIndex(line);
             if (typeof lineIndex === "number") {
                 this.anticipated.push(new LineRange(lineIndex, lineIndex));

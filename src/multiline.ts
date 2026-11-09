@@ -126,7 +126,7 @@ export class MultilineManager {
      */
     updateAfter(index: number, difference: number) {
         for (let multiline of this.activeMultilines) {
-            if (multiline.range.end >= index) {
+            if (multiline.range.end > index) {
                 multiline.range.end += difference;
                 if (multiline.range.start > index) {
                     multiline.range.start += difference;
@@ -142,10 +142,26 @@ export class MultilineManager {
      */
     multilinesOverlap(range: LineRange): LineRange | undefined {
         for (let multiline of this.activeMultilines) {
+            /*
+             * We need to handle edge cases when the index of the edit is equal
+             * to the multiline start or end. Tracking whether or not the edit
+             * is within the multiline introduces a lot of new complexity, so
+             * instead we just leave room for error and reparse the entire
+             * affected range.
+             *
+             * Not perfect as this doesn't accommodate multiline edits,
+             * especially cutting/pasting. Need to handle.
+             */
+            let wideRange = new LineRange(
+                multiline.range.start - 1,
+                multiline.range.end + 1
+            );
             if (
-                multiline.range.overlaps(range) &&
+                wideRange.overlaps(range) &&
                 !range.includesRange(multiline.range)
-            ) return multiline.range;
+            ) {
+                return multiline.range;
+            }
         }
         return;
     }
