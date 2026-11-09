@@ -17,7 +17,7 @@
   "main": "dist/fairfax.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ogions/fairfax"
+    "url": "git+https://github.com/ogions/fairfax.git"
   },
   "scripts": {
     "clean": "rm -rf dist",
