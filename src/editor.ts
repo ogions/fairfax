@@ -6,11 +6,11 @@ import { View } from "./view";
 
 export class Editor {
     container: HTMLElement;
+    view: View;
+    parser = new Parser();
+    mlManager: MultilineManager;
     history: EditorHistory;
     lineCount: number;
-    mlManager: MultilineManager;
-    parser = new Parser();
-    view: View;
     title: string;
     smartSpacing: boolean;
 
