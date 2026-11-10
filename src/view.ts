@@ -5,8 +5,9 @@ import { InlineSelection } from "./selection";
 export class View {
 
     container: HTMLElement;
-    anticipated: LineRange[];
-    blockMap = new Map([
+    anticipated: LineRange[] = [];
+
+    private static readonly blockMap = new Map([
         [BlockType.BlankLine, "fairfax-blankline"],
         [BlockType.Action, "fairfax-action"],
         [BlockType.SceneHeading, "fairfax-sceneheading"],
@@ -20,7 +21,8 @@ export class View {
         [BlockType.Synopsis, "fairfax-synopsis"],
         [BlockType.TitlePage, "fairfax-titlepage"]
     ]);
-    styleMap = new Map([
+
+    private static readonly styleMap = new Map([
         [RunStyle.Bold, "fairfax-bold"],
         [RunStyle.Italic, "fairfax-italic"],
         [RunStyle.Underline, "fairfax-underline"],
@@ -34,34 +36,77 @@ export class View {
 
     constructor(container: HTMLElement) {
         this.container = container;
-        this.anticipated = [];
         this.resetContainer();
     }
 
+    newBlankLine(): HTMLElement {
+        const line = document.createElement("div");
+        line.innerHTML = "<br>";
+        return line;
+    }
+
     resetContainer() {
-        this.container.innerHTML = '<div class="from-reset"><br></div>';
+        const line = this.newBlankLine();
+        this.container.replaceChildren(line);
         const selection = document.getSelection();
-        if (selection) selection.setPosition(this.container.children[0]);
+        if (selection) selection.setPosition(line);
+    }
+
+    getFocusNode(): Node | undefined {
+        const selection = document.getSelection();
+        if (!selection) return;
+        return selection.focusNode ?? undefined;
+    }
+
+    nodeIsLine(node: Node): boolean {
+        return (node.nodeName === "DIV" &&
+            node.parentNode &&
+            node.parentNode === this.container)
+            ?? false;
     }
     
     getLineElementFrom(node: Node): HTMLElement | undefined {
-        if (node.nodeName === "DIV" &&
-            node.parentNode &&
-            node.parentNode === this.container) {
-
+        if (this.nodeIsLine(node)) {
             return node as HTMLElement;
         }
+
         const parent = node.parentNode;
         if (!parent) return;
         return this.getLineElementFrom(parent);
     }
 
     getActiveLine(): HTMLElement | undefined {
-        const selection = document.getSelection();
-        if (!selection) return;
-        const anchor = selection.anchorNode;
-        if (!anchor) return;
-        return this.getLineElementFrom(anchor);
+        const focus = this.getFocusNode();
+        if (!focus) return;
+        return this.getLineElementFrom(focus) ?? this.tryRepairActiveLine(focus);
+    }
+
+    tryRepairActiveLine(focus: Node): HTMLElement | undefined {
+        if (this.container.querySelectorAll("div").length === 0) {
+            /* 
+             * If there are no child lines in the main container, then we need
+             * to reset the container to have one empty line element. This
+             * prevents the document from becoming malformed.
+             */
+            this.resetContainer();
+            const line = this.container.firstElementChild;
+            return line ? line as HTMLElement : undefined;
+        } else if (focus === this.container) {
+            /*
+             * Sometimes, a cut (i.e. via CTRL+X) will delete the active line
+             * element and replace it with an empty text node <br>. We'll
+             * replace that text node with a blank line if that's the case.
+             */
+            const selection = document.getSelection();
+            if (!selection) return;
+            const textNode = this.container.childNodes[selection.anchorOffset];
+            if (textNode && textNode.nodeName === "BR") {
+                const newLine = this.newBlankLine();
+                this.container.replaceChild(newLine, textNode);
+                selection.setPosition(newLine);
+                return newLine;
+            }
+        }
     }
 
     getLineIndex(line: HTMLElement): number | undefined {
@@ -239,7 +284,7 @@ export class View {
                 const span = document.createElement("span");
                 span.textContent = run.text;
                 for (let style of run.styles) {
-                    const runClass = this.styleMap.get(style);
+                    const runClass = View.styleMap.get(style);
                     if (typeof runClass === "string") {
                         span.classList.add(runClass);
                     }
@@ -256,7 +301,7 @@ export class View {
     classLine(line: HTMLElement, block: Block, activeLine?: HTMLElement, smartSpacing?: boolean) {
 
         // Class line element according to block type
-        line.className = this.blockMap.get(block.type) ?? "fairfax-action";
+        line.className = View.blockMap.get(block.type) ?? "fairfax-action";
 
         // Override if smart spacing is on and the block could be a character
         if (smartSpacing && block.couldBeChar && this.isActiveInOrAfter(line, activeLine)) {
@@ -285,9 +330,7 @@ export class View {
         if (prevLine && this.shouldSingleSpace(prevLine)) {
             return;
         }
-        const newLine = document.createElement("div");
-        newLine.innerHTML = "<br>";
-        line.before(newLine);
+        line.before(this.newBlankLine());
     }
     
     shouldSingleSpace(prevLine: HTMLElement) {

@@ -4,28 +4,43 @@ import { MultilineManager } from "./multiline";
 import { RangeContext, LineRange } from "./range";
 import { View } from "./view";
 
+export class EditorOptions {
+    smartSpacing: boolean;
+    
+    constructor(options: Partial<EditorOptions>) {
+        this.smartSpacing = options.smartSpacing ?? false;
+    }
+}
+
 export class Editor {
     container: HTMLElement;
     view: View;
     parser = new Parser();
-    mlManager: MultilineManager;
     history: EditorHistory;
-    lineCount: number;
-    title: string;
-    smartSpacing: boolean;
+    mlManager: MultilineManager;
+    lineCount: number = 0;
+    documentTitle: string | undefined;
+    options: EditorOptions;
 
-    constructor(container: HTMLElement, smartSpacing?: boolean) {
+    constructor(
+        container: HTMLElement,
+        options: Partial<EditorOptions> = {}
+    ) {
         this.container = container;
+        this.setupContainer();
+        this.view = new View(container);
+
+        this.history = new EditorHistory(this);
+        this.mlManager = new MultilineManager(this.view);
+
+        this.options = new EditorOptions(options);
+    }
+
+    setupContainer() {
         this.container.setAttribute("contenteditable", "true");
         this.container.addEventListener("input", (e) => {
-            this.handleInput(e as InputEvent)
+            this.handleInput(e as InputEvent);
         });
-        this.history = new EditorHistory(this);
-        this.lineCount = 0;
-        this.view = new View(container);
-        this.mlManager = new MultilineManager(this.view);
-        this.title = "";
-        this.smartSpacing = smartSpacing ?? false;
     }
 
     load(content: string) {
@@ -44,7 +59,7 @@ export class Editor {
         this.mlManager.manage(hyperionDocument, range);
         this.view.updateRange(range, hyperionDocument.blocks, true);
 
-        this.title = hyperionDocument.titlePage.get("Title") || "";
+        this.documentTitle = hyperionDocument.titlePage.get("Title") || undefined;
     }
 
     getContent(): string {
@@ -55,42 +70,13 @@ export class Editor {
     }
 
     handleInput(e: InputEvent) {
-
-        // Ignore composition events to avoid duplicating text
+        // Ignore composition events to avoid re-rendering/duplicating text
         if (e.inputType === "insertCompositionText") {
             return;
         }
 
         const activeLine = this.view.getActiveLine();
-
-        if (!activeLine) {
-            if (e.inputType.includes("delete")) {
-                /*
-                 * Sometimes, a cut (i.e. via CTRL+X) will delete the active
-                 * line element and replace it with an empty text node. We'll
-                 * replace that text node with a blank line if that's the case.
-                 */
-                const selection = document.getSelection();
-                if (selection && selection.anchorNode === this.container) {
-                    const textNode = this.container.childNodes[selection.anchorOffset];
-                    if (textNode && textNode.nodeName === "BR") {
-                        const newLine = document.createElement("div");
-                        newLine.innerHTML = "<br>";
-                        this.container.replaceChild(newLine, textNode);
-                        selection.setPosition(newLine);
-                        this.updateLine(newLine, true);
-                    }
-                }
-            } else if (this.container.querySelectorAll("div").length === 0) {
-                /* 
-                 * If there are no more child lines in the main container, then
-                 * we need to reset the container to have one empty line
-                 * element. This prevents the document from becoming malformed.
-                 */
-                this.view.resetContainer();
-            }
-            return;
-        }
+        if (!activeLine) return;
 
         if (e.inputType === "insertFromPaste") {
             const selection = document.getSelection();
@@ -100,8 +86,8 @@ export class Editor {
             return;
         }
 
-        // If smart spacing is turned on, check if we should add an extra line.
-        if (this.smartSpacing && e.inputType === "insertParagraph") {
+        // If smart spacing is turned on, we may need to insert an extra line.
+        if (e.inputType === "insertParagraph" && this.options.smartSpacing) {
             this.view.smartSpace(activeLine);
         }
 
@@ -115,8 +101,8 @@ export class Editor {
          * to rewrite it to reformat the flag.
          */
         if (
-            line.classList.contains("fairfax-dual") &&
-            line.classList.contains("fairfax-character")
+            line.classList.contains("fairfax-character") &&
+            line.classList.contains("fairfax-dual")
         ) {
             shouldRewrite = true;
         }
@@ -129,7 +115,7 @@ export class Editor {
 
     updateRange(range: LineRange, shouldRewrite?: boolean, pasteOffset?: number) {
 
-        if (this.smartSpacing) {
+        if (this.options.smartSpacing) {
             let overlap;
             for (const anticipatedRange of this.view.anticipated) {
                 overlap = range.extend(anticipatedRange);
@@ -166,7 +152,7 @@ export class Editor {
             context.isInDualDialogue,
             context.nextLineIsBlank,
             context.previousLineIsBlank,
-            this.smartSpacing
+            this.options.smartSpacing
         );
         const [firstLineInitialClass, lastLineInitialClass] = this.getNeighborClasses(range);
 
@@ -174,7 +160,7 @@ export class Editor {
         this.mlManager.manage(hyperionDocument, range);
         this.handleTitleChange(hyperionDocument.titlePage.get("Title"));
 
-        this.view.updateRange(range, hyperionDocument.blocks, shouldRewrite ?? false, pasteOffset, this.smartSpacing);
+        this.view.updateRange(range, hyperionDocument.blocks, shouldRewrite ?? false, pasteOffset, this.options.smartSpacing);
 
         /*
          * If we've changed the number of lines in any way (adding, deleting,
@@ -229,9 +215,8 @@ export class Editor {
     }
 
     handleTitleChange(newTitle: string | undefined) {
-        newTitle = newTitle ?? "";
-        if (this.title !== newTitle) {
-            this.title = newTitle;
+        if (this.documentTitle !== newTitle) {
+            this.documentTitle = newTitle;
         }
     }
 
