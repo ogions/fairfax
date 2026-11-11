@@ -48,14 +48,11 @@ export class View {
     resetContainer() {
         const line = this.newBlankLine();
         this.container.replaceChildren(line);
-        const selection = document.getSelection();
-        if (selection) selection.setPosition(line);
+        document.getSelection()?.setPosition(line);
     }
 
     getFocusNode(): Node | undefined {
-        const selection = document.getSelection();
-        if (!selection) return;
-        return selection.focusNode ?? undefined;
+        return document.getSelection()?.focusNode ?? undefined;
     }
 
     nodeIsLine(node: Node): boolean {

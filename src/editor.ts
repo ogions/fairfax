@@ -6,9 +6,11 @@ import { View } from "./view";
 
 export class EditorOptions {
     smartSpacing: boolean;
+    ignoreTab: boolean;
     
     constructor(options: Partial<EditorOptions>) {
         this.smartSpacing = options.smartSpacing ?? false;
+        this.ignoreTab = options.ignoreTab ?? false;
     }
 }
 
@@ -49,8 +51,7 @@ export class Editor {
             false, /* isInDialogue */
             false, /* isInDualDialogue */
             true, /* nextLineIsBlank */
-            true, /* previousLineIsBlank */
-            false /* anticipateCharacter */
+            true /* previousLineIsBlank */
         );
         const hyperionDocument = this.parser.parse(content, parserContext);
         
@@ -158,7 +159,7 @@ export class Editor {
 
         const hyperionDocument = this.parser.parse(text, parserContext);
         this.mlManager.manage(hyperionDocument, range);
-        this.handleTitleChange(hyperionDocument.titlePage.get("Title"));
+        this.updateTitle(hyperionDocument.titlePage.get("Title"));
 
         this.view.updateRange(range, hyperionDocument.blocks, shouldRewrite ?? false, pasteOffset, this.options.smartSpacing);
 
@@ -214,7 +215,7 @@ export class Editor {
         return [firstLine?.className, lastLine?.className];
     }
 
-    handleTitleChange(newTitle: string | undefined) {
+    updateTitle(newTitle: string | undefined) {
         if (this.documentTitle !== newTitle) {
             this.documentTitle = newTitle;
         }
